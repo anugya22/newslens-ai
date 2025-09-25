@@ -296,7 +296,7 @@ For technical issues or feature requests:
 
 ## 🔗 Links
 
-- [Live Demo](https://your-deployed-app.vercel.app)
+- [Live Demo](https://newslens-ai.vercel.app/)
 - [GitHub Repository](https://github.com/anugya22/newslens-ai.git)
 
 <img width="956" height="476" alt="image" src="https://github.com/user-attachments/assets/50a6e422-3093-4b99-9bc0-10c04cc66597" />
