@@ -1,103 +1,224 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import { Toaster } from 'react-hot-toast';
+import { useStore } from './lib/store';
+import Header from './components/layout/Header';
+import ChatInterface from './components/chat/ChatInterface';
+import NewsSidebar from './components/news/NewsSidebar';
+import MarketAnalysis from './components/Analysis/MarketAnalysis';
+import APISettings from './components/Settings/APISettings';
+
+// Infer the MarketAnalysis type from the component props
+type MarketAnalysisType = React.ComponentProps<typeof MarketAnalysis>['analysis'];
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const { 
+    settings, 
+    marketMode, 
+    sidebarOpen, 
+    setSidebarOpen,
+    selectedArticle,
+    setSelectedArticle,
+    messages 
+  } = useStore();
+  
+  // Header handles its own settings modal, so we don't need this state
+  const [showMarketAnalysis, setShowMarketAnalysis] = useState(false);
+  const [currentAnalysis, setCurrentAnalysis] = useState<MarketAnalysisType | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Apply theme on mount
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', settings.theme === 'dark');
+  }, [settings.theme]);
+
+  // Check if market analysis should be shown
+  useEffect(() => {
+    const latestMessage = messages[messages.length - 1];
+    if (marketMode && latestMessage?.type === 'assistant' && latestMessage.marketAnalysis) {
+      setCurrentAnalysis(latestMessage.marketAnalysis);
+      setShowMarketAnalysis(true);
+    }
+  }, [messages, marketMode]);
+
+  // Get related topic from latest chat
+  const getRelatedTopic = () => {
+    const latestUserMessage = [...messages]
+      .reverse()
+      .find(msg => msg.type === 'user');
+    
+    if (latestUserMessage) {
+      // Extract key terms from user message
+      const words = latestUserMessage.content
+        .toLowerCase()
+        .split(' ')
+        .filter(word => word.length > 3)
+        .slice(0, 2)
+        .join(' ');
+      return words || 'breaking news';
+    }
+    
+    return marketMode ? 'market news' : 'breaking news';
+  };
+
+  // Use state to avoid hydration mismatch
+  const [isLargeScreen, setIsLargeScreen] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900">
+      {/* Background Pattern */}
+      <div className="fixed inset-0 opacity-10">
+        <div 
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fillRule='evenodd'%3E%3Cg fill='%23ffffff' fillOpacity='0.1'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+          }}
+        />
+      </div>
+
+      {/* Header */}
+      <Header />
+
+      {/* Main Content */}
+      <div className="pt-16 md:pt-20 h-screen flex">
+        {/* Chat Interface */}
+        <div className="flex-1 flex flex-col">
+          <ChatInterface />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+        {/* News Sidebar */}
+        <AnimatePresence>
+          {(sidebarOpen || isLargeScreen) && (
+            <div className={`
+              ${sidebarOpen ? 'fixed inset-y-0 right-0 z-40' : 'hidden lg:block'}
+              w-full max-w-sm lg:max-w-md xl:max-w-lg
+              pt-16 md:pt-20
+            `}>
+              <div className="h-full p-4">
+                <NewsSidebar relatedTopic={getRelatedTopic()} />
+              </div>
+              
+              {/* Mobile Overlay */}
+              {sidebarOpen && (
+                <div
+                  className="fixed inset-0 bg-black/50 backdrop-blur-sm lg:hidden"
+                  onClick={() => setSidebarOpen(false)}
+                  style={{ zIndex: -1 }}
+                />
+              )}
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Market Analysis Modal */}
+      <AnimatePresence>
+        {showMarketAnalysis && currentAnalysis && (
+          <MarketAnalysis
+            analysis={currentAnalysis}
+            isVisible={showMarketAnalysis}
+            onClose={() => setShowMarketAnalysis(false)}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        )}
+      </AnimatePresence>
+
+      {/* Market Analysis Trigger - Floating Button */}
+      {currentAnalysis && !showMarketAnalysis && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button
+            onClick={() => setShowMarketAnalysis(true)}
+            className="bg-primary-500 hover:bg-primary-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span className="hidden sm:inline">View Analysis</span>
+          </button>
+        </div>
+      )}
+
+      {/* Article Detail Modal */}
+      <AnimatePresence>
+        {selectedArticle && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Article Details
+                  </h2>
+                  <button
+                    onClick={() => setSelectedArticle(null)}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                {selectedArticle.image && (
+                  <img
+                    src={selectedArticle.image}
+                    alt={selectedArticle.title}
+                    className="w-full h-64 object-cover rounded-lg mb-6"
+                  />
+                )}
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                  {selectedArticle.title}
+                </h1>
+                <p className="text-gray-700 dark:text-gray-300 mb-4">
+                  {selectedArticle.description}
+                </p>
+                <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                  <span>Source: {selectedArticle.source}</span>
+                  <span>{new Date(selectedArticle.publishedAt).toLocaleDateString()}</span>
+                </div>
+                <div className="mt-6">
+                  <a
+                    href={selectedArticle.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
+                  >
+                    Read Full Article
+                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast Notifications */}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: settings.theme === 'dark' ? '#374151' : '#ffffff',
+            color: settings.theme === 'dark' ? '#ffffff' : '#111827',
+            border: '1px solid',
+            borderColor: settings.theme === 'dark' ? '#4B5563' : '#E5E7EB',
+          },
+        }}
+      />
     </div>
   );
 }
