@@ -41,7 +41,6 @@ const Header: React.FC = () => {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
-  // Empty notifications array - in production, these would come from real data
   const notifications: Notification[] = [];
 
   return (
@@ -51,27 +50,25 @@ const Header: React.FC = () => {
         animate={{ y: 0 }}
         className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-gray-900/80 border-b border-white/10"
       >
-        <div className="flex items-center justify-between px-4 py-3">
-          {/* Logo and Title */}
+        <div className="flex items-center justify-between px-6 py-4">
           <motion.div 
-            className="flex items-center space-x-3"
+            className="flex items-center space-x-4"
             whileHover={{ scale: 1.02 }}
           >
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500">
+            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500">
               <TrendingUp className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
                 NewsLens AI
               </h1>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 mt-0.5">
                 Intelligent News Analysis
               </p>
             </div>
           </motion.div>
 
-          {/* Center Controls */}
-          <div className="hidden md:flex items-center space-x-2">
+          <div className="hidden md:flex items-center space-x-3">
             <Button
               variant={marketMode ? 'primary' : 'ghost'}
               size="sm"
@@ -81,7 +78,7 @@ const Header: React.FC = () => {
               Market Mode
             </Button>
             
-            <div className="w-px h-6 bg-white/20" />
+            <div className="w-px h-6 bg-white/20 mx-2" />
             
             <Button
               variant="ghost"
@@ -92,9 +89,7 @@ const Header: React.FC = () => {
             </Button>
           </div>
 
-          {/* Right Controls */}
-          <div className="flex items-center space-x-2">
-            {/* Notifications - Only show if there are real notifications */}
+          <div className="flex items-center space-x-3">
             {notifications.length > 0 && (
               <div className="relative">
                 <Button
@@ -144,7 +139,6 @@ const Header: React.FC = () => {
               </div>
             )}
 
-            {/* Theme Toggle */}
             <Button
               variant="ghost"
               size="sm"
@@ -152,7 +146,6 @@ const Header: React.FC = () => {
               onClick={toggleTheme}
             />
 
-            {/* Settings */}
             <Button
               variant="ghost"
               size="sm"
@@ -160,7 +153,6 @@ const Header: React.FC = () => {
               onClick={() => setShowSettings(true)}
             />
 
-            {/* Mobile Menu */}
             <div className="md:hidden">
               <Button
                 variant="ghost"
@@ -172,8 +164,7 @@ const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Mode Selector */}
-        <div className="md:hidden px-4 pb-3">
+        <div className="md:hidden px-6 pb-4 pt-2">
           <div className="flex space-x-2">
             <Button
               variant={marketMode ? 'primary' : 'ghost'}
@@ -197,13 +188,11 @@ const Header: React.FC = () => {
         </div>
       </motion.header>
 
-      {/* Settings Modal */}
       <APISettings 
         isOpen={showSettings} 
         onClose={() => setShowSettings(false)} 
       />
 
-      {/* Click outside to close notifications */}
       {showNotifications && (
         <div
           className="fixed inset-0 z-40"
