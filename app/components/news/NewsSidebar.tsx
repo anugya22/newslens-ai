@@ -15,7 +15,6 @@ import { NewsArticle } from '../../types';
 import { useStore } from '../../lib/store';
 import { NewsService } from '../../lib/apis';
 
-// Import Swiper styles
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
@@ -77,7 +76,6 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
   };
 
   const handleBookmark = (article: NewsArticle) => {
-    // In a real app, save to bookmarks
     console.log('Bookmarked:', article.title);
   };
 
@@ -112,15 +110,14 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-6">
-      {/* Trending Topics */}
+    <div className="h-full flex flex-col space-y-6 p-6">
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <GlassCard className="p-4">
-          <h2 className="text-gray-900 dark:text-white font-semibold mb-4 flex items-center">
+        <GlassCard className="p-6">
+          <h2 className="text-gray-900 dark:text-white font-semibold mb-5 flex items-center">
             <TrendingUp className="w-5 h-5 mr-2 text-primary-500 dark:text-primary-400" />
             Trending Topics
           </h2>
@@ -131,7 +128,7 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.1 }}
-                className="px-3 py-1.5 text-sm bg-white/20 hover:bg-white/30 border border-white/30 rounded-full text-white hover:text-primary-200 transition-all duration-200 font-medium"
+                className="px-4 py-2 text-sm bg-white/20 hover:bg-white/30 border border-white/30 rounded-full text-white hover:text-primary-200 transition-all duration-200 font-medium"
                 onClick={() => handleTopicClick(topic)}
               >
                 {topic}
@@ -141,15 +138,14 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
         </GlassCard>
       </motion.div>
 
-      {/* News Feed */}
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.2 }}
         className="flex-1"
       >
-        <GlassCard className="p-4 h-full">
-          <div className="flex items-center justify-between mb-4">
+        <GlassCard className="p-6 h-full">
+          <div className="flex items-center justify-between mb-5">
             <h2 className="text-lg font-semibold text-white">
               {relatedTopic ? `Related: ${relatedTopic}` : 'Latest News'}
             </h2>
@@ -191,11 +187,10 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
                       transition={{ delay: index * 0.1 }}
                       className="group"
                     >
-                      <div className="p-4 bg-white/10 hover:bg-white/20 transition-all duration-300 cursor-pointer rounded-xl border border-white/20 backdrop-blur-sm">
-                        {/* Article Header */}
-                        <div className="flex items-start justify-between mb-3">
+                      <div className="p-5 bg-white/10 hover:bg-white/20 transition-all duration-300 cursor-pointer rounded-xl border border-white/20 backdrop-blur-sm">
+                        <div className="flex items-start justify-between mb-4">
                           <div className="flex-1">
-                            <h3 className="text-gray-900 dark:text-white font-semibold leading-tight group-hover:text-primary-600 dark:group-hover:text-primary-200 transition-colors line-clamp-2 mb-2">
+                            <h3 className="text-gray-900 dark:text-white font-semibold leading-tight group-hover:text-primary-600 dark:group-hover:text-primary-200 transition-colors line-clamp-2 mb-3">
                               {article.title}
                             </h3>
                             <div className="flex flex-wrap items-center gap-2">
@@ -220,11 +215,11 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
                           </div>
                           
                           {article.image && (
-                            <div className="ml-3 flex-shrink-0">
+                            <div className="ml-4 flex-shrink-0">
                               <img
                                 src={article.image}
                                 alt=""
-                                className="w-16 h-16 rounded-lg object-cover"
+                                className="w-20 h-20 rounded-lg object-cover"
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none';
                                 }}
@@ -233,12 +228,10 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
                           )}
                         </div>
 
-                        {/* Article Description */}
-                        <p className="text-sm text-gray-200 leading-relaxed line-clamp-3 mb-3">
+                        <p className="text-sm text-gray-200 leading-relaxed line-clamp-3 mb-4">
                           {article.description}
                         </p>
 
-                        {/* Article Footer */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2 text-xs text-gray-300">
                             <Clock className="w-3 h-3" />
@@ -288,7 +281,6 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
         </GlassCard>
       </motion.div>
 
-      {/* Custom Swiper Styles */}
       <style jsx global>{`
         .news-swiper .swiper-button-next,
         .news-swiper .swiper-button-prev {
