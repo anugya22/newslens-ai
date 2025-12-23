@@ -36,7 +36,7 @@ export const useChatAPI = () => {
     setIsTyping(true);
 
     try {
-      const openRouter = new OpenRouterAPI(settings.openRouterKey);
+      import { openRouterAPI } from '@/lib/api';
       
       // Get AI response
       const aiResponse = await openRouter.analyzeNews(content, marketMode);
