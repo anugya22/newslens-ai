@@ -1,17 +1,90 @@
 import axios from 'axios';
 import { parseString } from 'xml2js';
 import { NewsArticle, MarketAnalysis, MarketData, NewsSearchParams } from '../types';
+import { API_KEYS, AI_CONFIG, RATE_LIMITS, STORAGE_KEYS, isAPIConfigured } from './config';
 
+// ================================================================
+// RATE LIMITING HELPERS (LocalStorage - No Database Needed!)
+// ================================================================
+
+interface RateLimitData {
+  count: number;
+  date: string; // YYYY-MM-DD
+}
+
+function getTodayString(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getRateLimitData(key: string): RateLimitData {
+  if (typeof window === 'undefined') return { count: 0, date: getTodayString() };
+  
+  try {
+    const stored = localStorage.getItem(key);
+    if (!stored) return { count: 0, date: getTodayString() };
+    
+    const data: RateLimitData = JSON.parse(stored);
+    
+    // Reset if different day
+    if (data.date !== getTodayString()) {
+      return { count: 0, date: getTodayString() };
+    }
+    
+    return data;
+  } catch {
+    return { count: 0, date: getTodayString() };
+  }
+}
+
+function setRateLimitData(key: string, data: RateLimitData): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function incrementRateLimit(key: string): void {
+  const data = getRateLimitData(key);
+  data.count += 1;
+  setRateLimitData(key, data);
+}
+
+function checkRateLimit(key: string, limit: number): { allowed: boolean; remaining: number; resetTime: string } {
+  const data = getRateLimitData(key);
+  const allowed = data.count < limit;
+  const remaining = Math.max(0, limit - data.count);
+  
+  // Calculate reset time (midnight tonight)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  const resetTime = tomorrow.toLocaleTimeString();
+  
+  return { allowed, remaining, resetTime };
+}
+
+// ================================================================
 // OpenRouter API for AI Analysis
+// ================================================================
+
 export class OpenRouterAPI {
   private apiKey: string;
   private baseURL = 'https://openrouter.ai/api/v1';
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+  constructor() {
+    // Get API key from config (environment variables)
+    this.apiKey = API_KEYS.OPENROUTER;
   }
 
   async analyzeNews(content: string, marketMode = false): Promise<string> {
+    // Check if API key is configured
+    if (!this.apiKey) {
+      return 'OpenRouter API key not configured. Please add NEXT_PUBLIC_OPENROUTER_API_KEY to your environment variables.';
+    }
+
     const prompt = marketMode 
       ? `As a financial analyst, analyze this news content and provide market impact analysis including:
          1. Overall market sentiment (bullish/bearish/neutral)
@@ -27,10 +100,11 @@ export class OpenRouterAPI {
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
         {
-          model: 'xai/grok-4-fast',
+          // ⭐ USING BEST FREE MODEL - Unlimited, No tokens!
+          model: AI_CONFIG.MODEL,
           messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7,
-          max_tokens: 1000,
+          temperature: AI_CONFIG.TEMPERATURE,
+          max_tokens: AI_CONFIG.MAX_TOKENS,
         },
         {
           headers: {
@@ -41,8 +115,17 @@ export class OpenRouterAPI {
       );
 
       return response.data.choices[0].message.content;
-    } catch (error) {
+    } catch (error: any) {
       console.error('OpenRouter API Error:', error);
+      
+      // Better error messages
+      if (error.response?.status === 401) {
+        return 'Invalid API key. Please check your NEXT_PUBLIC_OPENROUTER_API_KEY.';
+      }
+      if (error.response?.status === 429) {
+        return 'Rate limit exceeded. Please try again in a moment.';
+      }
+      
       return marketMode 
         ? 'Market analysis temporarily unavailable. Please try again later.'
         : 'News analysis temporarily unavailable. Please try again later.';
@@ -51,8 +134,6 @@ export class OpenRouterAPI {
 
   async parseAndAnalyzeURL(url: string, marketMode = false): Promise<string> {
     try {
-      // For demo purposes, we'll simulate URL parsing
-      // In production, you'd implement proper web scraping
       const analysis = await this.analyzeNews(`Analyze news from URL: ${url}`, marketMode);
       return analysis;
     } catch (error) {
@@ -62,13 +143,14 @@ export class OpenRouterAPI {
   }
 }
 
+// ================================================================
 // Google News RSS Parser
+// ================================================================
+
 export class NewsService {
   async getNewsByTopic(topic: string): Promise<NewsArticle[]> {
     try {
       const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-US&gl=US&ceid=US:en`;
-      
-      // Using a CORS proxy for demo - in production, use your own proxy
       const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
       
       const response = await axios.get(proxyUrl);
@@ -139,7 +221,6 @@ export class NewsService {
   }
 
   private getRealisticFallbackNews(topic: string): NewsArticle[] {
-    // Realistic fallback news based on common topics
     const fallbackArticles = {
       'technology': [
         {
@@ -201,7 +282,7 @@ export class NewsService {
       title: article.title,
       description: article.description,
       url: '#',
-      publishedAt: new Date(Date.now() - (index * 3600000)).toISOString(), // Stagger timestamps
+      publishedAt: new Date(Date.now() - (index * 3600000)).toISOString(),
       source: article.source,
       sentiment: article.sentiment,
       marketRelevance: article.marketRelevance,
@@ -209,7 +290,6 @@ export class NewsService {
   }
 
   async getTrendingTopics(): Promise<string[]> {
-    // Realistic trending topics based on current market interests
     return [
       'Technology Stocks',
       'Federal Reserve',
@@ -223,16 +303,38 @@ export class NewsService {
   }
 }
 
-// Alpha Vantage for Market Data
+// ================================================================
+// Alpha Vantage for Market Data (WITH RATE LIMITING!)
+// ================================================================
+
 export class MarketDataService {
   private apiKey: string;
   private baseURL = 'https://www.alphavantage.co/query';
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+  constructor() {
+    this.apiKey = API_KEYS.ALPHA_VANTAGE;
   }
 
   async getStockQuote(symbol: string): Promise<MarketData | null> {
+    // Check if API key is configured
+    if (!this.apiKey) {
+      console.warn('Alpha Vantage API key not configured');
+      return null;
+    }
+
+    // ⭐ CHECK RATE LIMIT (25/day)
+    const { allowed, remaining, resetTime } = checkRateLimit(
+      STORAGE_KEYS.ALPHA_REQUESTS,
+      RATE_LIMITS.ALPHA_VANTAGE_DAILY
+    );
+
+    if (!allowed) {
+      throw new Error(
+        `⚠️ Alpha Vantage daily limit reached (25 requests/day). ` +
+        `Resets at ${resetTime}. Try again tomorrow!`
+      );
+    }
+
     try {
       const response = await axios.get(this.baseURL, {
         params: {
@@ -245,6 +347,9 @@ export class MarketDataService {
       const quote = response.data['Global Quote'];
       if (!quote) return null;
 
+      // ⭐ INCREMENT RATE LIMIT COUNTER (successful request)
+      incrementRateLimit(STORAGE_KEYS.ALPHA_REQUESTS);
+
       return {
         symbol: quote['01. symbol'],
         price: parseFloat(quote['05. price']),
@@ -253,21 +358,53 @@ export class MarketDataService {
         volume: parseInt(quote['06. volume']),
         lastUpdated: quote['07. latest trading day'],
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Market data error:', error);
+      
+      // Better error messages
+      if (error.response?.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again in a moment.');
+      }
+      
       return null;
     }
   }
 
   async getTopStocks(): Promise<MarketData[]> {
     const symbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'NVDA', 'META'];
-    const promises = symbols.map(symbol => this.getStockQuote(symbol));
-    const results = await Promise.all(promises);
-    return results.filter(Boolean) as MarketData[];
+    const results: MarketData[] = [];
+
+    // Sequential requests to avoid overwhelming rate limit
+    for (const symbol of symbols) {
+      try {
+        const quote = await this.getStockQuote(symbol);
+        if (quote) results.push(quote);
+      } catch (error: any) {
+        // If rate limit hit, return what we have so far
+        if (error.message.includes('daily limit')) {
+          console.warn('Rate limit reached while fetching stocks');
+          break;
+        }
+      }
+    }
+
+    return results;
+  }
+
+  // Get remaining requests for today
+  getRemainingRequests(): { remaining: number; resetTime: string } {
+    const { remaining, resetTime } = checkRateLimit(
+      STORAGE_KEYS.ALPHA_REQUESTS,
+      RATE_LIMITS.ALPHA_VANTAGE_DAILY
+    );
+    return { remaining, resetTime };
   }
 }
 
+// ================================================================
 // Enhanced Sentiment Analysis
+// ================================================================
+
 export function analyzeSentiment(text: string): 'positive' | 'negative' | 'neutral' {
   if (!text) return 'neutral';
   
@@ -287,7 +424,6 @@ export function analyzeSentiment(text: string): 'positive' | 'negative' | 'neutr
   const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;
   const negativeCount = negativeWords.filter(word => lowerText.includes(word)).length;
   
-  // Apply weight based on context
   let positiveWeight = positiveCount;
   let negativeWeight = negativeCount;
   
@@ -301,3 +437,11 @@ export function analyzeSentiment(text: string): 'positive' | 'negative' | 'neutr
   if (negativeWeight > positiveWeight) return 'negative';
   return 'neutral';
 }
+
+// ================================================================
+// Export singleton instances
+// ================================================================
+
+export const openRouterAPI = new OpenRouterAPI();
+export const newsAPI = new NewsService();
+export const marketDataAPI = new MarketDataService();
