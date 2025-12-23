@@ -10,7 +10,6 @@ import NewsSidebar from './components/news/NewsSidebar';
 import MarketAnalysis from './components/Analysis/MarketAnalysis';
 import APISettings from './components/Settings/APISettings';
 
-// Infer the MarketAnalysis type from the component props
 type MarketAnalysisType = React.ComponentProps<typeof MarketAnalysis>['analysis'];
 
 export default function Home() {
@@ -24,7 +23,6 @@ export default function Home() {
     messages 
   } = useStore();
   
-  // Header handles its own settings modal, so we don't need this state
   const [showMarketAnalysis, setShowMarketAnalysis] = useState(false);
   const [currentAnalysis, setCurrentAnalysis] = useState<MarketAnalysisType | null>(null);
 
@@ -49,7 +47,6 @@ export default function Home() {
       .find(msg => msg.type === 'user');
     
     if (latestUserMessage) {
-      // Extract key terms from user message
       const words = latestUserMessage.content
         .toLowerCase()
         .split(' ')
@@ -62,7 +59,6 @@ export default function Home() {
     return marketMode ? 'market news' : 'breaking news';
   };
 
-  // Use state to avoid hydration mismatch
   const [isLargeScreen, setIsLargeScreen] = useState(false);
 
   useEffect(() => {
@@ -91,19 +87,19 @@ export default function Home() {
       {/* Header */}
       <Header />
 
-      {/* Main Content */}
+      {/* Main Content - IMPROVED LAYOUT */}
       <div className="pt-16 md:pt-20 h-screen flex">
-        {/* Chat Interface */}
-        <div className="flex-1 flex flex-col">
+        {/* Chat Interface - NOW BIGGER (70-75% on large screens) */}
+        <div className="flex-1 flex flex-col lg:w-3/4 xl:w-[70%]">
           <ChatInterface />
         </div>
 
-        {/* News Sidebar */}
+        {/* News Sidebar - SMALLER (25-30% on large screens) */}
         <AnimatePresence>
           {(sidebarOpen || isLargeScreen) && (
             <div className={`
-              ${sidebarOpen ? 'fixed inset-y-0 right-0 z-40' : 'hidden lg:block'}
-              w-full max-w-sm lg:max-w-md xl:max-w-lg
+              ${sidebarOpen ? 'fixed inset-y-0 right-0 z-40' : 'hidden lg:block lg:w-1/4 xl:w-[30%]'}
+              w-full max-w-sm lg:max-w-none
               pt-16 md:pt-20
             `}>
               <div className="h-full p-4">
