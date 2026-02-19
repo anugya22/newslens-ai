@@ -9,14 +9,14 @@ export const API_KEYS = {
   // Get from: https://openrouter.ai/keys
   // Add in Vercel: NEXT_PUBLIC_OPENROUTER_API_KEY
   OPENROUTER: process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || '',
-  
-  // Get from: https://newsapi.org/register
-  // Add in Vercel: NEXT_PUBLIC_NEWS_API_KEY
-  NEWS_API: process.env.NEXT_PUBLIC_NEWS_API_KEY || '',
-  
-  // Get from: https://www.alphavantage.co/support/#api-key
-  // Add in Vercel: NEXT_PUBLIC_ALPHA_VANTAGE_KEY
-  ALPHA_VANTAGE: process.env.NEXT_PUBLIC_ALPHA_VANTAGE_KEY || '',
+
+  // Get from: https://finnhub.io/dashboard
+  // Add in Vercel: NEXT_PUBLIC_FINNHUB_API_KEY
+  FINNHUB: process.env.NEXT_PUBLIC_FINNHUB_API_KEY || '',
+
+  // CoinGecko is free and doesn't usually need a key for basic usage, 
+  // but we can add an optional one if needed.
+  COINGECKO: process.env.NEXT_PUBLIC_COINGECKO_API_KEY || '',
 };
 
 // AI Model Configuration
@@ -43,25 +43,21 @@ export const STORAGE_KEYS = {
 // Validation
 export function validateAPIKeys() {
   const warnings: string[] = [];
-  
+
   if (!API_KEYS.OPENROUTER) {
     warnings.push('⚠️ OpenRouter API key not configured');
   }
-  
-  if (!API_KEYS.NEWS_API) {
-    warnings.push('⚠️ News API key not configured (optional)');
+
+  if (!API_KEYS.FINNHUB) {
+    warnings.push('⚠️ Finnhub API key not configured (optional)');
   }
-  
-  if (!API_KEYS.ALPHA_VANTAGE) {
-    warnings.push('⚠️ Alpha Vantage key not configured (optional)');
-  }
-  
+
   return {
     isValid: warnings.length === 0,
     warnings,
   };
 }
 
-export function isAPIConfigured(api: 'OPENROUTER' | 'NEWS_API' | 'ALPHA_VANTAGE'): boolean {
+export function isAPIConfigured(api: 'OPENROUTER' | 'FINNHUB' | 'COINGECKO'): boolean {
   return !!API_KEYS[api];
 }

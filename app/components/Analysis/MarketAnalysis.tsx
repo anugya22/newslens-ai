@@ -6,6 +6,9 @@ import { TrendingUp, TrendingDown, AlertTriangle, Target, BarChart3, PieChart, A
 import { MarketAnalysis as MarketAnalysisType } from '../../types';
 import TrendChart from './TrendChart';
 import RiskAssessment from './RiskAssessment';
+import TradingViewWidget from '../market/TradingViewWidget';
+import { Button } from '../ui/Button';
+import { useStore } from '../../lib/store';
 
 interface MarketAnalysisProps {
   analysis: MarketAnalysisType;
@@ -43,7 +46,7 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
       onClick={onClose}
     >
       <motion.div
@@ -51,37 +54,88 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="bg-white dark:bg-gray-900 rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
+        className="bg-white dark:bg-gray-900 rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
+<<<<<<< HEAD
         <div className="p-8 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-900/20 dark:to-accent-900/20">
+=======
+        {/* Header - Fixed at top */}
+        <div className="shrink-0 p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-900/20 dark:to-accent-900/20 relative z-10">
+>>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className={`p-3 rounded-xl border ${getSentimentColor(analysis.sentiment)}`}>
                 {getSentimentIcon(analysis.sentiment)}
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Market Analysis
+                <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">
+                  Financial Advisory Analysis
                 </h2>
+<<<<<<< HEAD
                 <p className="text-gray-600 dark:text-gray-400 mt-1">
                   Comprehensive market impact assessment
+=======
+                <p className="text-gray-700 dark:text-gray-300 font-medium">
+                  Expert market impact and crypto intelligence assessment
+>>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex items-center space-x-2">
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm border border-transparent"
+                onClick={() => {
+                  const query = `Can you explain this ${analysis.sentiment} analysis for ${analysis.sectors[0]?.name} in simple terms? What are the key risks and opportunities?`;
+                  useStore.getState().setPendingExplanation(query);
+                  onClose();
+                }}
+              >
+                <div className="flex items-center space-x-1">
+                  <span className="text-sm font-medium">Explain This</span>
+                </div>
+              </Button>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
+<<<<<<< HEAD
         <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
           <div className="p-8 space-y-8">
+=======
+        {/* Content */}
+        <div className="overflow-y-auto max-h-[calc(90vh-120px)] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700">
+          <div className="p-6 space-y-8">
+            {/* Explanatory Box */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="bg-primary-500/10 dark:bg-primary-500/20 border border-primary-500/30 p-5 rounded-2xl"
+            >
+              <div className="flex items-start space-x-4">
+                <div className="p-2 bg-primary-500 rounded-lg shrink-0">
+                  <BarChart3 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">About these Analytics</h3>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                    These analytics provide a quantitative and qualitative breakdown of how news events influence market trends, stock valuations, and crypto assets. Our "stepfun" reasoning engine evaluates sentiment, risk scores, and sector-specific triggers to assist your financial decision-making process.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Overview Cards */}
+>>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
@@ -194,7 +248,12 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                         {sector.reasoning}
                       </p>
+<<<<<<< HEAD
                       
+=======
+
+                      {/* Stock Impacts */}
+>>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
                       {sector.stocks && sector.stocks.length > 0 && (
                         <div className="space-y-2">
                           <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -211,9 +270,8 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
                               </div>
                               <div className="flex items-center space-x-2">
                                 <span
-                                  className={`text-sm font-medium ${
-                                    stock.predictedChange > 0 ? 'text-green-600' : 'text-red-600'
-                                  }`}
+                                  className={`text-sm font-medium ${stock.predictedChange > 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}
                                 >
                                   {stock.predictedChange > 0 ? '+' : ''}{stock.predictedChange.toFixed(1)}%
                                 </span>
@@ -270,13 +328,29 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.9 }}
+              className="w-full"
             >
-              <TrendChart analysis={analysis} />
+              {analysis.symbol ? (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                    <BarChart3 className="w-5 h-5" />
+                    <span>Real-Time Market Chart ({analysis.symbol})</span>
+                  </h3>
+                  <div className="w-full h-[450px] rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-xl bg-white dark:bg-gray-800">
+                    <TradingViewWidget
+                      symbol={analysis.symbol}
+                      height={450}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <TrendChart analysis={analysis} />
+              )}
             </motion.div>
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div >
   );
 };
 

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # NewsLens AI - Intelligent News Analysis Platform
 
 A sophisticated AI-powered news analysis platform with market intelligence capabilities, built with Next.js 14, TypeScript, and Tailwind CSS.
@@ -306,3 +307,69 @@ For technical issues or feature requests:
 
 
 *NewsLens AI - Transforming how you understand the news and markets*
+=======
+# NewsLens AI 🧠📈
+
+**Intelligent Portfolio Tracking & Risk-Aware News Analysis**
+
+NewsLens AI is a premium financial dashboard that solves the "noise" problem for investors. Unlike standard news apps, it doesn't just list headlines—it analyzes them against your actual portfolio to tell you exactly how global events affect your wealth.
+
+---
+
+## 🌎 How it Works: Real-Time News (No Public API)
+Most financial apps rely on expensive, restrictive public APIs (like NewsAPI or Bloomberg) that often have delayed data. 
+
+**NewsLens AI uses a custom-built Hybrid RSS Engine:**
+-   **Direct Sourcing**: We pull data directly from top-tier financial RSS feeds (Economic Times, LiveMint, CNBC, Wall Street Journal, CoinDesk).
+-   **CORS-Proxy Architecture**: A custom server-side proxy bypasses browser restrictions, allowing us to fetch news in real-time without being blocked.
+-   **Zero Delay**: Because we source directly from publishers, you get news the moment it is published, without waiting for a third-party aggregator.
+
+---
+
+## 🤖 Specialized AI Modes
+NewsLens AI features three distinct analysis modes to tailor the intelligence to your current focus:
+
+1.  **Normal News Mode**: General news analysis. Focuses on clarity and readability, translating complex financial jargon into simple English. Translates upto 200 languages. Parses through links.
+2.  **Market Mode**: Deep-dive analysis for stock investors. It identifies affected sectors, predicts bullish/bearish sentiment, and specifies which stocks in your portfolio are at risk.
+3.  **Crypto Mode**: Optimized for the volatility of digital assets. It scans for regulatory changes, whale movements, and technological shifts that impact Bitcoin, Ethereum, and Altcoins.
+
+---
+
+## 🚀 Key Features
+
+### 1. **Smart Portfolio Tracking**
+-   **Live Data**: Real-time price updates for Stocks (via Finnhub) and Crypto (via CoinGecko).
+-   **Auto-Calculations**: Instant visibility into Daily Change, Total Return, and Asset Distribution.
+-   **Secure Storage**: Powered by Supabase with Row Level Security (RLS) to keep your financial data private.
+
+### 2. **AI News Analyst (StepFun & Gemini)**
+-   **Context-Aware**: The AI knows your holdings. It ignores irrelevant noise and focuses on news that actually impacts your money.
+-   **Sentiment Scoring**: Automatically categorizes news as Positive, Negative, or Neutral.
+-   **Deep Insight**: Identifies "Risks" and "Opportunities" with specific suggestions (Buy/Sell/Hold context).
+
+### 3. **Smart Alerts System** 🚨
+-   **High-Impact Scanning**: Continuous scanning for critical events (Market Crashes, Crypto Surges).
+-   **Email Notifications**: Integrated with **Resend** to send instant alerts to your inbox when a High-Risk event is detected for one of your assets.
+-   **Intelligent Caching**: Prevents duplicate alerts for the same news story.
+
+---
+
+## 🛠️ Tech Stack
+-   **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Framer Motion.
+-   **Data Engine**: Hybrid RSS Parser (Economic Times, CNBC, WSJ, etc.).
+-   **Backend/Auth**: Supabase (PostgreSQL).
+-   **AI Intelligence**: OpenRouter (Llama 3, Gemini, StepFun).
+-   **Communication**: Resend API.
+
+---
+
+
+
+## 🎯 Target Audience
+-   **Retail Investors**: Professional-grade analysis without the Bloomberg price tag.
+-   **Crypto Enthusiasts**: Real-time sentiment tracking for volatile markets.
+-   **Busy Professionals**: Automated alerts so you only check the market when it actually matters.
+
+---
+
+>>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)

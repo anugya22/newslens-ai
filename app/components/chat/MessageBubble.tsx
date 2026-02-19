@@ -3,16 +3,18 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
-import { Bot, User, TrendingUp, TrendingDown, Minus, ExternalLink, BarChart3 } from 'lucide-react';
+import { Bot, User, TrendingUp, TrendingDown, Minus, ExternalLink, BarChart3, Activity } from 'lucide-react';
 import { ChatMessage } from '../../types';
 import { useStore } from '../../lib/store';
+import TradingViewWidget from '../market/TradingViewWidget';
+import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 
 interface MessageBubbleProps {
   message: ChatMessage;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
-  const { marketMode } = useStore();
+  const { marketMode, cryptoMode } = useStore();
   const isUser = message.type === 'user';
 
   const getSentimentIcon = (sentiment?: string) => {
@@ -51,11 +53,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start space-x-3 max-w-[80%]`}>
         {/* Avatar */}
         <motion.div
-          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-            isUser 
-              ? 'bg-gradient-to-r from-primary-500 to-primary-600' 
-              : 'bg-gradient-to-r from-accent-500 to-accent-600'
-          }`}
+          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${isUser
+            ? 'bg-gradient-to-r from-primary-500 to-primary-600'
+            : 'bg-gradient-to-r from-accent-500 to-accent-600'
+            }`}
           whileHover={{ scale: 1.05 }}
         >
           {isUser ? (
@@ -66,15 +67,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         </motion.div>
 
         {/* Message Content */}
-        <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-2`}>
+        <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-2 w-full`}>
           {/* Main Message */}
           <motion.div
-            className={`px-4 py-3 rounded-2xl backdrop-blur-sm border ${
-              isUser
-                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white border-primary-500/30'
-                : `bg-gradient-to-r ${getSentimentGradient(message.marketAnalysis?.sentiment)} text-gray-900 dark:text-white`
-            }`}
-            whileHover={{ scale: 1.02 }}
+            className={`px-5 py-3 rounded-2xl backdrop-blur-md border ${isUser
+              ? 'bg-gradient-to-tr from-primary-600 to-primary-700 text-white border-primary-500/30'
+              : `bg-white/70 dark:bg-gray-800/70 ${getSentimentGradient(message.marketAnalysis?.sentiment)} text-gray-900 dark:text-white border-gray-200/50 dark:border-white/10`
+              } shadow-lg shadow-black/5 dark:shadow-white/5`}
+            whileHover={{ scale: 1.01 }}
           >
             <div className="flex items-start space-x-2">
               {!isUser && message.marketAnalysis && (
@@ -83,59 +83,62 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                 </div>
               )}
               <div className="flex-1">
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {message.content}
-                </p>
+                <div className="text-sm leading-relaxed">
+                  <MarkdownRenderer content={message.content} />
+                </div>
               </div>
             </div>
           </motion.div>
 
-          {/* Market Analysis Card */}
-          {!isUser && message.marketAnalysis && marketMode && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-              className="w-full max-w-md bg-white/80 dark:bg-gray-800/80 rounded-xl p-4 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-                  <BarChart3 className="w-4 h-4" />
-                  <span>Market Analysis</span>
-                </h4>
-                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  message.marketAnalysis.sentiment === 'bullish' 
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+          {/* Market Analysis Trigger Button - On-Demand */}
+          {!isUser && message.marketAnalysis && (marketMode || cryptoMode) && (
+            <div className="space-y-3 w-full">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                <button
+                  onClick={() => useStore.getState().setSelectedAnalysis(message.marketAnalysis)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${message.marketAnalysis.sentiment === 'bullish'
+                    ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800'
                     : message.marketAnalysis.sentiment === 'bearish'
-                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                }`}>
-                  {message.marketAnalysis.sentiment.toUpperCase()}
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Impact Score:</span>
-                  <span className="font-medium">{message.marketAnalysis.impactScore}/10</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Confidence:</span>
-                  <span className="font-medium">{message.marketAnalysis.confidence}%</span>
-                </div>
-              </div>
+                      ? 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
+                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800'
+                    }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>View {cryptoMode ? 'Crypto' : 'Market'} Analysis</span>
+                  <span className="opacity-60 text-xs ml-1">
+                    ({message.marketAnalysis.impactScore}/10 Impact)
+                  </span>
+                </button>
+              </motion.div>
 
-              {/* Top Sectors */}
-              {message.marketAnalysis.sectors.slice(0, 3).map((sector, index) => (
-                <div key={index} className="flex items-center justify-between py-2 border-t border-gray-200/50 dark:border-gray-700/50 first:border-t-0">
-                  <span className="text-sm text-gray-700 dark:text-gray-300">{sector.name}</span>
-                  <div className="flex items-center space-x-2">
-                    {getSentimentIcon(sector.impact)}
-                    <span className="text-xs font-medium">{sector.score.toFixed(1)}</span>
-                  </div>
-                </div>
+              {/* Candlestick Charts (Supports Multi-Ticker) */}
+              {(message.marketAnalysis.symbols || [message.marketAnalysis.symbol]).map((sym, idx) => (
+                sym && (
+                  <motion.div
+                    key={sym + idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 + (idx * 0.1) }}
+                    className="w-full space-y-2"
+                  >
+                    <div className="flex items-center space-x-2 text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 uppercase tracking-wider">
+                      <Activity className="w-3 h-3" />
+                      <span>{sym} Live Chart</span>
+                    </div>
+                    <div className="w-full h-[300px] rounded-2xl overflow-hidden border border-gray-200/50 dark:border-white/10 shadow-lg bg-white dark:bg-gray-800">
+                      <TradingViewWidget
+                        symbol={sym}
+                        height={300}
+                      />
+                    </div>
+                  </motion.div>
+                )
               ))}
-            </motion.div>
+            </div>
           )}
 
           {/* News Context Cards */}
@@ -144,7 +147,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3 }}
-              className="w-full max-w-md space-y-2"
+              className="w-full space-y-2"
             >
               {message.newsContext.slice(0, 2).map((article, index) => (
                 <div
@@ -182,7 +185,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
           {/* Timestamp */}
           <span className={`text-xs text-gray-500 dark:text-gray-400 ${isUser ? 'mr-2' : 'ml-2'}`}>
-            {formatDistanceToNow(message.timestamp, { addSuffix: true })}
+            {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
           </span>
         </div>
       </div>

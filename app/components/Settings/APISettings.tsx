@@ -17,12 +17,14 @@ const APISettings: React.FC<APISettingsProps> = ({ isOpen, onClose }) => {
     openRouter: false,
     newsApi: false,
     alphaVantage: false,
+    economicData: false,
   });
-  
+
   const [formData, setFormData] = useState({
     openRouterKey: settings.openRouterKey || '',
     newsApiKey: settings.newsApiKey || '',
     alphaVantageKey: settings.alphaVantageKey || '',
+    economicDataKey: settings.economicDataKey || '',
     autoRefresh: settings.autoRefresh,
     notifications: settings.notifications,
   });
@@ -31,6 +33,7 @@ const APISettings: React.FC<APISettingsProps> = ({ isOpen, onClose }) => {
     openRouter: null as boolean | null,
     newsApi: null as boolean | null,
     alphaVantage: null as boolean | null,
+    economicData: null as boolean | null,
   });
 
   const testAPIKey = async (service: string, key: string) => {
@@ -41,7 +44,7 @@ const APISettings: React.FC<APISettingsProps> = ({ isOpen, onClose }) => {
 
     try {
       let isValid = false;
-      
+
       switch (service) {
         case 'openRouter':
           // Test OpenRouter API
@@ -53,23 +56,33 @@ const APISettings: React.FC<APISettingsProps> = ({ isOpen, onClose }) => {
           });
           isValid = openRouterResponse.ok;
           break;
-          
+
         case 'newsApi':
           // Test News API (if using NewsAPI.org)
           const newsResponse = await fetch(`https://newsapi.org/v2/top-headlines?country=us&pageSize=1&apiKey=${key}`);
           isValid = newsResponse.ok;
           break;
-          
+
         case 'alphaVantage':
           // Test Alpha Vantage API
           const alphaResponse = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${key}`);
           const alphaData = await alphaResponse.json();
           isValid = !alphaData['Error Message'] && !alphaData['Note'];
           break;
+
+        case 'economicData':
+          // Test FRED API
+          // Needs proxy because FRED doesn't support CORS usually
+          const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=GDP&api_key=${key}&file_type=json`;
+          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(fredUrl)}`;
+          const fredResponse = await fetch(proxyUrl);
+          const fredData = await fredResponse.json();
+          isValid = fredData && fredData.contents && JSON.parse(fredData.contents).observations;
+          break;
       }
 
       setTestResults(prev => ({ ...prev, [service]: isValid }));
-      
+
       if (isValid) {
         toast.success(`${service} API key is valid!`);
       } else {
@@ -87,10 +100,11 @@ const APISettings: React.FC<APISettingsProps> = ({ isOpen, onClose }) => {
       openRouterKey: formData.openRouterKey.trim(),
       newsApiKey: formData.newsApiKey.trim(),
       alphaVantageKey: formData.alphaVantageKey.trim(),
+      economicDataKey: formData.economicDataKey?.trim(),
       autoRefresh: formData.autoRefresh,
       notifications: formData.notifications,
     });
-    
+
     toast.success('Settings saved successfully!');
     onClose();
   };
@@ -146,142 +160,26 @@ const APISettings: React.FC<APISettingsProps> = ({ isOpen, onClose }) => {
 
         {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-180px)] p-6 space-y-8">
-          {/* API Keys Section */}
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-              <Key className="w-5 h-5" />
-              <span>API Keys</span>
-            </h3>
-
-            {/* OpenRouter API Key */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                OpenRouter API Key <span className="text-red-500">*</span>
+          {/* AI Model Selection */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                AI Model
               </label>
-              <div className="relative">
-                <input
-                  type={showKeys.openRouter ? 'text' : 'password'}
-                  value={formData.openRouterKey}
-                  onChange={(e) => setFormData(prev => ({ ...prev, openRouterKey: e.target.value }))}
-                  className="w-full px-4 py-3 pr-24 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="sk-or-..."
-                />
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleShowKey('openRouter')}
-                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                  >
-                    {showKeys.openRouter ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => testAPIKey('openRouter', formData.openRouterKey)}
-                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                    title="Test API Key"
-                  >
-                    {testResults.openRouter === true ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : testResults.openRouter === false ? (
-                      <AlertCircle className="w-4 h-4 text-red-500" />
-                    ) : (
-                      <div className="w-4 h-4 border-2 border-gray-400 rounded-full"></div>
-                    )}
-                  </button>
-                </div>
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Required for AI analysis. Get your key from{' '}
-                <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-primary-500 hover:underline">
-                  openrouter.ai
-                </a>
-              </p>
-            </div>
-
-            {/* News API Key */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                News API Key <span className="text-gray-400">(Optional)</span>
-              </label>
-              <div className="relative">
-                <input
-                  type={showKeys.newsApi ? 'text' : 'password'}
-                  value={formData.newsApiKey}
-                  onChange={(e) => setFormData(prev => ({ ...prev, newsApiKey: e.target.value }))}
-                  className="w-full px-4 py-3 pr-24 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="Enter NewsAPI.org key (optional)"
-                />
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleShowKey('newsApi')}
-                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                  >
-                    {showKeys.newsApi ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => testAPIKey('newsApi', formData.newsApiKey)}
-                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                    title="Test API Key"
-                  >
-                    {testResults.newsApi === true ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : testResults.newsApi === false ? (
-                      <AlertCircle className="w-4 h-4 text-red-500" />
-                    ) : (
-                      <div className="w-4 h-4 border-2 border-gray-400 rounded-full"></div>
-                    )}
-                  </button>
-                </div>
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                For enhanced news coverage. Uses free Google News RSS if not provided.
-              </p>
-            </div>
-
-            {/* Alpha Vantage API Key */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Alpha Vantage API Key <span className="text-gray-400">(Optional)</span>
-              </label>
-              <div className="relative">
-                <input
-                  type={showKeys.alphaVantage ? 'text' : 'password'}
-                  value={formData.alphaVantageKey}
-                  onChange={(e) => setFormData(prev => ({ ...prev, alphaVantageKey: e.target.value }))}
-                  className="w-full px-4 py-3 pr-24 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="Enter Alpha Vantage key for market data"
-                />
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleShowKey('alphaVantage')}
-                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                  >
-                    {showKeys.alphaVantage ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => testAPIKey('alphaVantage', formData.alphaVantageKey)}
-                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                    title="Test API Key"
-                  >
-                    {testResults.alphaVantage === true ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : testResults.alphaVantage === false ? (
-                      <AlertCircle className="w-4 h-4 text-red-500" />
-                    ) : (
-                      <div className="w-4 h-4 border-2 border-gray-400 rounded-full"></div>
-                    )}
-                  </button>
-                </div>
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                For real-time stock market data in market analysis mode.
+              <select
+                value={settings.selectedModel || 'deepseek/deepseek-r1:free'}
+                onChange={(e) => updateSettings({ selectedModel: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="stepfun/step-3.5-flash:free">StepFun - Step 3.5 Flash (Primary)</option>
+                <option value="mistralai/mistral-7b-instruct:free">Mistral 7B Instruct (Optional)</option>
+              </select>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                Select the AI model for analysis. StepFun (Step 3.5 Flash) is recommended for best results.
               </p>
             </div>
           </div>
+
 
           {/* Preferences Section */}
           <div className="space-y-6">
@@ -353,7 +251,7 @@ const APISettings: React.FC<APISettingsProps> = ({ isOpen, onClose }) => {
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div >
   );
 };
 

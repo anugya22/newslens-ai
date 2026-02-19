@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    optimizePackageImports: ['recharts', 'framer-motion', 'lucide-react'],
-  },
   images: {
     remotePatterns: [
       {
@@ -12,11 +9,7 @@ const nextConfig = {
     ],
     unoptimized: true,
   },
-  output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
-  trailingSlash: true,
-  distDir: 'out',
-  assetPrefix: process.env.NODE_ENV === 'production' ? './' : '',
-  
+
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
       config.resolve.alias = {
@@ -24,17 +17,17 @@ const nextConfig = {
         '@swiper/react': '@swiper/react/swiper-react.js',
       };
     }
-    
+
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
       net: false,
       tls: false,
     };
-    
+
     return config;
   },
-  
+
   async headers() {
     return [
       {
@@ -48,7 +41,7 @@ const nextConfig = {
       },
     ];
   },
-  
+
   async redirects() {
     return [
       {
@@ -58,7 +51,7 @@ const nextConfig = {
       },
     ];
   },
-  
+
   compress: true,
 };
 

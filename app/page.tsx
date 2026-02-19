@@ -8,55 +8,66 @@ import Header from './components/layout/Header';
 import ChatInterface from './components/chat/ChatInterface';
 import NewsSidebar from './components/news/NewsSidebar';
 import MarketAnalysis from './components/Analysis/MarketAnalysis';
-import APISettings from './components/Settings/APISettings';
+
 
 type MarketAnalysisType = React.ComponentProps<typeof MarketAnalysis>['analysis'];
 
 export default function Home() {
-  const { 
-    settings, 
-    marketMode, 
-    sidebarOpen, 
+  const {
+    settings,
+    marketMode,
+    cryptoMode,
+    sidebarOpen,
     setSidebarOpen,
     selectedArticle,
     setSelectedArticle,
-    messages 
+    selectedAnalysis,
+    messages
   } = useStore();
-  
-  const [showMarketAnalysis, setShowMarketAnalysis] = useState(false);
-  const [currentAnalysis, setCurrentAnalysis] = useState<MarketAnalysisType | null>(null);
+
+  // Header handles its own settings modal, so we don't need this state
+  // Market Analysis is now handled globally via selectedAnalysis in store
 
   // Apply theme on mount
   useEffect(() => {
     document.documentElement.classList.toggle('dark', settings.theme === 'dark');
   }, [settings.theme]);
 
-  // Check if market analysis should be shown
-  useEffect(() => {
-    const latestMessage = messages[messages.length - 1];
-    if (marketMode && latestMessage?.type === 'assistant' && latestMessage.marketAnalysis) {
-      setCurrentAnalysis(latestMessage.marketAnalysis);
-      setShowMarketAnalysis(true);
-    }
-  }, [messages, marketMode]);
+
 
   // Get related topic from latest chat
   const getRelatedTopic = () => {
     const latestUserMessage = [...messages]
       .reverse()
       .find(msg => msg.type === 'user');
-    
+
     if (latestUserMessage) {
-      const words = latestUserMessage.content
+      const content = latestUserMessage.content;
+
+      // 1. Look for explicit stock symbols/crypto (uppercase, 2-5 chars, maybe starting with $)
+      // Regex for potential tickers: \b[A-Z]{2,5}\b or \$[A-Za-z]{2,5}
+      const tickerMatch = content.match(/\b[A-Z]{2,5}\b/g) || content.match(/\$[A-Za-z]{2,5}/g);
+
+      if (tickerMatch && tickerMatch.length > 0) {
+        return tickerMatch[0].replace('$', '');
+      }
+
+      // 2. Fallback: Extract first meaningful keyword (simple split)
+      const words = content
         .toLowerCase()
+        .replace(/[^\w\s]/g, '') // Remove punctuation
         .split(' ')
-        .filter(word => word.length > 3)
-        .slice(0, 2)
-        .join(' ');
-      return words || 'breaking news';
+        .filter(word => word.length > 3 && !['what', 'when', 'where', 'price', 'news', 'about', 'analysis'].includes(word));
+
+      if (words.length > 0) {
+        return words[0]; // User asked for "first word" relevance
+      }
     }
-    
-    return marketMode ? 'market news' : 'breaking news';
+
+    // Default topics based on mode
+    if (cryptoMode) return 'cryptocurrency';
+    if (marketMode) return 'market';
+    return 'breaking news';
   };
 
   const [isLargeScreen, setIsLargeScreen] = useState(false);
@@ -65,32 +76,27 @@ export default function Home() {
     const checkScreenSize = () => {
       setIsLargeScreen(window.innerWidth >= 1024);
     };
-    
+
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
-    
+
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900 transition-colors duration-300">
       {/* Background Pattern */}
       <div className="fixed inset-0 opacity-10">
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fillRule='evenodd'%3E%3Cg fill='%23ffffff' fillOpacity='0.1'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-          }}
-        />
+        <div className="absolute inset-0" />
       </div>
 
       {/* Header */}
       <Header />
 
-      {/* Main Content - IMPROVED LAYOUT */}
-      <div className="pt-16 md:pt-20 h-screen flex">
-        {/* Chat Interface - NOW BIGGER (70-75% on large screens) */}
-        <div className="flex-1 flex flex-col lg:w-3/4 xl:w-[70%]">
+      {/* Main Content */}
+      <div className="pt-24 md:pt-28 h-screen flex relative z-0">
+        {/* Chat Interface */}
+        <div className="flex-1 flex flex-col">
           <ChatInterface />
         </div>
 
@@ -98,14 +104,13 @@ export default function Home() {
         <AnimatePresence>
           {(sidebarOpen || isLargeScreen) && (
             <div className={`
-              ${sidebarOpen ? 'fixed inset-y-0 right-0 z-40' : 'hidden lg:block lg:w-1/4 xl:w-[30%]'}
-              w-full max-w-sm lg:max-w-none
-              pt-16 md:pt-20
+              ${sidebarOpen ? 'fixed inset-y-0 right-0 z-40' : 'hidden lg:block'}
+              w-full max-w-sm lg:max-w-md xl:max-w-lg
             `}>
               <div className="h-full p-4">
                 <NewsSidebar relatedTopic={getRelatedTopic()} />
               </div>
-              
+
               {/* Mobile Overlay */}
               {sidebarOpen && (
                 <div
@@ -121,29 +126,16 @@ export default function Home() {
 
       {/* Market Analysis Modal */}
       <AnimatePresence>
-        {showMarketAnalysis && currentAnalysis && (
+        {selectedAnalysis && (
           <MarketAnalysis
-            analysis={currentAnalysis}
-            isVisible={showMarketAnalysis}
-            onClose={() => setShowMarketAnalysis(false)}
+            analysis={selectedAnalysis}
+            isVisible={!!selectedAnalysis}
+            onClose={() => useStore.getState().setSelectedAnalysis(null)}
           />
         )}
       </AnimatePresence>
 
-      {/* Market Analysis Trigger - Floating Button */}
-      {currentAnalysis && !showMarketAnalysis && (
-        <div className="fixed bottom-6 right-6 z-40">
-          <button
-            onClick={() => setShowMarketAnalysis(true)}
-            className="bg-primary-500 hover:bg-primary-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            <span className="hidden sm:inline">View Analysis</span>
-          </button>
-        </div>
-      )}
+      {/* Floating button removed as per design - user accesses analysis via chat bubbles */}
 
       {/* Article Detail Modal */}
       <AnimatePresence>

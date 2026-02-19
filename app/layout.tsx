@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
-import './globals.css';  // Keep it as ./globals.css
+import './globals.css';
+import { AuthProvider } from './context/AuthContext';
+import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
   title: 'NewsLens AI',
@@ -13,8 +15,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased">
-        {children}
+      <body suppressHydrationWarning className="antialiased bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-200">
+        <AuthProvider>
+          {children}
+          <Toaster position="bottom-right" />
+        </AuthProvider>
       </body>
     </html>
   );

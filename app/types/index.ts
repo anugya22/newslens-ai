@@ -15,7 +15,7 @@ export interface ChatMessage {
   id: string;
   type: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
+  timestamp: string;
   newsContext?: NewsArticle[];
   marketAnalysis?: MarketAnalysis;
 }
@@ -28,6 +28,8 @@ export interface MarketAnalysis {
   opportunities: string[];
   prediction: string;
   confidence: number;
+  symbol?: string;
+  symbols?: string[];
 }
 
 export interface SectorAnalysis {
@@ -57,6 +59,8 @@ export interface AppSettings {
   openRouterKey?: string;
   newsApiKey?: string;
   alphaVantageKey?: string;
+  economicDataKey?: string; // FRED API Key
+  selectedModel?: string; // New field for model selection
   theme: 'light' | 'dark';
   marketMode: boolean;
   autoRefresh: boolean;

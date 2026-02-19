@@ -1,34 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import axios from 'axios';
 import { useStore } from '../lib/store';
 import { OpenRouterAPI } from '../lib/apis';
 import { ChatMessage, MarketAnalysis, SectorAnalysis, RiskFactor } from '../types';
 import toast from 'react-hot-toast';
 
 export const useChatAPI = () => {
-  const { 
-    addMessage, 
-    setLoading, 
-    settings, 
+  const {
+    addMessage,
+    setLoading,
+    settings,
     marketMode,
-    news 
+    cryptoMode,
+    news
   } = useStore();
-  
+
   const [isTyping, setIsTyping] = useState(false);
 
-  const sendMessage = async (content: string) => {
-    if (!settings.openRouterKey) {
-      toast.error('Please configure your OpenRouter API key in settings');
-      return;
-    }
-
+  const sendMessage = useCallback(async (content: string) => {
     // Add user message
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       type: 'user',
       content,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
     addMessage(userMessage);
 
@@ -36,187 +33,89 @@ export const useChatAPI = () => {
     setIsTyping(true);
 
     try {
-      import { openRouterAPI } from '@/lib/api';
-      
-      // Get AI response
-      const aiResponse = await openRouter.analyzeNews(content, marketMode);
-      
-      let marketAnalysis: MarketAnalysis | undefined;
-      
-      // Generate market analysis if in market mode
-      if (marketMode) {
-        marketAnalysis = await generateMarketAnalysis(content, aiResponse);
-      }
+      // Call internal API route (keeps keys hidden)
+      const response = await axios.post('/api/chat', {
+        message: content,
+        model: settings.selectedModel || 'google/gemini-2.0-flash-exp:free', // Pass selected model
+        marketMode: marketMode,
+        cryptoMode: cryptoMode
+      });
 
-      // Get relevant news context
-      const newsContext = getRelevantNews(content);
+      const { content: aiContent, marketAnalysis } = response.data;
 
-      // Add assistant message
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
+      const aiMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: aiResponse,
-        timestamp: new Date(),
-        newsContext,
-        marketAnalysis,
+        content: aiContent,
+        timestamp: new Date().toISOString(),
+        marketAnalysis: marketAnalysis as MarketAnalysis | undefined
       };
-      
-      addMessage(assistantMessage);
-      
+
+      addMessage(aiMessage);
     } catch (error) {
-      console.error('Chat error:', error);
-      toast.error('Failed to get response. Please try again.');
-      
-      // Add error message
+      console.error('Chat Error:', error);
+      toast.error('Failed to get AI response. Please check your internet or API key.');
+
       const errorMessage: ChatMessage = {
-        id: `error-${Date.now()}`,
+        id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: 'Sorry, I encountered an error while processing your request. Please try again.',
-        timestamp: new Date(),
+        content: "I'm having trouble connecting to the AI right now. Please check your API settings.",
+        timestamp: new Date().toISOString(),
       };
       addMessage(errorMessage);
     } finally {
       setLoading(false);
       setIsTyping(false);
     }
-  };
+  }, [settings.selectedModel, marketMode, cryptoMode, addMessage, setLoading]);
 
-  const parseLink = async (message: string, url: string) => {
-    if (!settings.openRouterKey) {
-      toast.error('Please configure your OpenRouter API key in settings');
-      return;
-    }
-
-    // Add user message
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      type: 'user',
-      content: message,
-      timestamp: new Date(),
-    };
-    addMessage(userMessage);
+  const parseLink = useCallback(async (message: string, url: string) => {
+    if (!url) return;
 
     setLoading(true);
-    setIsTyping(true);
+    // Add user message with link
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: message,
+      timestamp: new Date().toISOString(),
+    };
+    addMessage(userMsg);
 
     try {
-      const openRouter = new OpenRouterAPI(settings.openRouterKey);
-      
-      // Parse and analyze URL
-      const analysis = await openRouter.parseAndAnalyzeURL(url, marketMode);
-      
-      let marketAnalysis: MarketAnalysis | undefined;
-      
-      if (marketMode) {
-        marketAnalysis = await generateMarketAnalysis(url, analysis);
-      }
+      // Here we would ideally fetch the URL content content specifically
+      // For now, we'll ask the AI to "read" it (some models can browse, others allow passing URL context)
+      // Since we are using free models, we will simulate "reading" by passing the URL to the prompt
+      // and hoping the model has knowledge or we would need a separate scraping service.
+      // For a robust app, we'd use a server-side scraper.
 
-      // Add assistant message
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
+      const response = await axios.post('/api/chat', {
+        message: `${message}\n\nPlease analyze this URL: ${url}`,
+        model: settings.selectedModel || 'google/gemini-2.0-flash-exp:free',
+        marketMode: marketMode
+      });
+
+      const analysis = response.data.content;
+
+      const aiMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
         type: 'assistant',
         content: analysis,
-        timestamp: new Date(),
-        marketAnalysis,
+        timestamp: new Date().toISOString(),
       };
-      
-      addMessage(assistantMessage);
-      
-      // Try to fetch related news
-      await fetchRelatedNews(extractKeywordsFromUrl(url));
-      
+
+      addMessage(aiMessage);
+
     } catch (error) {
-      console.error('Link parsing error:', error);
-      toast.error('Failed to parse the link. Please try again.');
+      console.error('URL Analysis Error:', error);
+      toast.error('Failed to analyze URL');
     } finally {
       setLoading(false);
-      setIsTyping(false);
     }
-  };
+  }, [settings.selectedModel, marketMode, cryptoMode, addMessage, setLoading]);
 
-  const generateMarketAnalysis = async (newsContent: string, aiResponse: string): Promise<MarketAnalysis> => {
-    // Mock market analysis generation - in production, use AI
-    const sectors: SectorAnalysis[] = [
-      'Technology', 'Finance', 'Healthcare', 'Energy', 'Consumer', 'Industrial'
-    ].map(name => ({
-      name,
-      impact: (Math.random() > 0.5 ? 'positive' : Math.random() > 0.3 ? 'negative' : 'neutral') as 'positive' | 'negative' | 'neutral',
-      score: Math.floor(Math.random() * 10) + 1,
-      reasoning: `${name} sector shows ${Math.random() > 0.5 ? 'strong' : 'moderate'} correlation with current market trends.`,
-      stocks: [
-        {
-          symbol: 'AAPL',
-          name: 'Apple Inc.',
-          predictedChange: (Math.random() - 0.5) * 10,
-          reasoning: 'Based on current market sentiment and sector performance.',
-          confidence: Math.floor(Math.random() * 30) + 70
-        }
-      ]
-    }));
 
-    const risks: RiskFactor[] = [
-      {
-        type: 'Market Volatility',
-        severity: (Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
-        description: 'Potential market fluctuations based on current news sentiment.',
-        probability: Math.random() * 0.8 + 0.2
-      },
-      {
-        type: 'Regulatory Risk',
-        severity: (Math.random() > 0.8 ? 'high' : 'medium') as 'high' | 'medium' | 'low',
-        description: 'Policy changes may impact market sectors differently.',
-        probability: Math.random() * 0.6 + 0.1
-      }
-    ];
 
-    const sentiment: 'bullish' | 'bearish' | 'neutral' = Math.random() > 0.6 ? 'bullish' : Math.random() > 0.3 ? 'bearish' : 'neutral';
-
-    return {
-      sentiment,
-      impactScore: Math.floor(Math.random() * 10) + 1,
-      sectors,
-      risks,
-      opportunities: [
-        'Monitor sector rotation opportunities',
-        'Consider defensive positioning',
-        'Evaluate growth vs. value allocation',
-        'Watch for volatility trading opportunities'
-      ],
-      prediction: 'Market showing mixed signals with potential for increased volatility in the near term. Key sectors to watch include technology and healthcare.',
-      confidence: Math.floor(Math.random() * 30) + 70
-    };
-  };
-
-  const getRelevantNews = (query: string) => {
-    // Filter current news based on relevance to query
-    const keywords = query.toLowerCase().split(' ');
-    return news.filter(article => {
-      const titleWords = article.title.toLowerCase();
-      const descWords = article.description.toLowerCase();
-      return keywords.some(keyword => 
-        titleWords.includes(keyword) || descWords.includes(keyword)
-      );
-    }).slice(0, 3);
-  };
-
-  const extractKeywordsFromUrl = (url: string): string[] => {
-    // Simple keyword extraction from URL
-    const urlParts = url.split('/');
-    const keywords = urlParts
-      .join(' ')
-      .replace(/[-_]/g, ' ')
-      .split(' ')
-      .filter(word => word.length > 3)
-      .slice(0, 5);
-    
-    return keywords;
-  };
-
-  const fetchRelatedNews = async (keywords: string[]) => {
-    // This would fetch news related to the parsed content
-    // For now, just a placeholder
-    console.log('Fetching related news for:', keywords);
-  };
 
   return {
     sendMessage,

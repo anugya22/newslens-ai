@@ -20,14 +20,14 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseClasses = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
-  
+
   const variants = {
     primary: 'bg-gradient-to-r from-primary-600 to-primary-700 text-white hover:from-primary-700 hover:to-primary-800 focus:ring-primary-500 shadow-lg hover:shadow-xl',
     secondary: 'bg-white/10 text-white border border-white/20 hover:bg-white/20 backdrop-blur-sm focus:ring-primary-500',
-    ghost: 'text-gray-300 hover:text-white hover:bg-white/10 focus:ring-primary-500',
+    ghost: 'text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 focus:ring-primary-500',
     danger: 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800 focus:ring-red-500 shadow-lg hover:shadow-xl',
   };
-  
+
   const sizes = {
     sm: 'px-3 py-1.5 text-sm gap-2',
     md: 'px-4 py-2 text-sm gap-2',
@@ -68,7 +68,7 @@ export const GlassCard: React.FC<{
   return (
     <motion.div
       whileHover={hover ? { scale: 1.02, y: -2 } : undefined}
-      className={`backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl shadow-2xl ${className}`}
+      className={`backdrop-blur-xl bg-white/40 dark:bg-gray-900/40 border border-gray-200/50 dark:border-white/10 rounded-xl shadow-2xl ${className}`}
     >
       {children}
     </motion.div>
@@ -94,7 +94,7 @@ export const Input: React.FC<React.InputHTMLAttributes<HTMLInputElement> & {
           </div>
         )}
         <input
-          className={`block w-full px-3 py-2 ${icon ? 'pl-10' : ''} bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent backdrop-blur-sm ${className}`}
+          className={`block w-full px-4 py-3 ${icon ? 'pl-11' : ''} bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent backdrop-blur-sm transition-all duration-200 ${className}`}
           {...props}
         />
       </div>
@@ -117,7 +117,7 @@ export const Badge: React.FC<{
     warning: 'bg-yellow-500/20 text-yellow-400',
     info: 'bg-blue-500/20 text-blue-400',
   };
-  
+
   const sizes = {
     sm: 'px-2 py-0.5 text-xs',
     md: 'px-3 py-1 text-sm',

@@ -18,18 +18,18 @@ function getTodayString(): string {
 
 function getRateLimitData(key: string): RateLimitData {
   if (typeof window === 'undefined') return { count: 0, date: getTodayString() };
-  
+
   try {
     const stored = localStorage.getItem(key);
     if (!stored) return { count: 0, date: getTodayString() };
-    
+
     const data: RateLimitData = JSON.parse(stored);
-    
+
     // Reset if different day
     if (data.date !== getTodayString()) {
       return { count: 0, date: getTodayString() };
     }
-    
+
     return data;
   } catch {
     return { count: 0, date: getTodayString() };
@@ -38,7 +38,7 @@ function getRateLimitData(key: string): RateLimitData {
 
 function setRateLimitData(key: string, data: RateLimitData): void {
   if (typeof window === 'undefined') return;
-  
+
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch {
@@ -56,13 +56,13 @@ function checkRateLimit(key: string, limit: number): { allowed: boolean; remaini
   const data = getRateLimitData(key);
   const allowed = data.count < limit;
   const remaining = Math.max(0, limit - data.count);
-  
+
   // Calculate reset time (midnight tonight)
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(0, 0, 0, 0);
   const resetTime = tomorrow.toLocaleTimeString();
-  
+
   return { allowed, remaining, resetTime };
 }
 
@@ -79,14 +79,9 @@ export class OpenRouterAPI {
     this.apiKey = API_KEYS.OPENROUTER;
   }
 
-  async analyzeNews(content: string, marketMode = false): Promise<string> {
-    // Check if API key is configured
-    if (!this.apiKey) {
-      return 'OpenRouter API key not configured. Please add NEXT_PUBLIC_OPENROUTER_API_KEY to your environment variables.';
-    }
-
-    const prompt = marketMode 
-      ? `As a financial analyst, analyze this news content and provide market impact analysis including:
+  async analyzeNews(content: string, marketMode = false, model = 'google/gemini-2.0-flash-exp:free'): Promise<string> {
+    const prompt = marketMode
+      ? `As a "Financial Advisor" with full facts, analyze this news content. If the content is in a foreign language (e.g., Hindi), translate the key insights into English. Provide market impact analysis including:
          1. Overall market sentiment (bullish/bearish/neutral)
          2. Affected sectors and predicted impact
          3. Risk assessment and opportunities
@@ -94,14 +89,13 @@ export class OpenRouterAPI {
          5. Confidence level and reasoning
          
          News content: ${content}`
-      : `Analyze and explain this news content in a clear, comprehensive way: ${content}`;
+      : `Analyze and explain this news content in clear, comprehensive English (translating if necessary): ${content}`;
 
     try {
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
         {
-          // ⭐ USING BEST FREE MODEL - Unlimited, No tokens!
-          model: AI_CONFIG.MODEL,
+          model: model,
           messages: [{ role: 'user', content: prompt }],
           temperature: AI_CONFIG.TEMPERATURE,
           max_tokens: AI_CONFIG.MAX_TOKENS,
@@ -117,24 +111,17 @@ export class OpenRouterAPI {
       return response.data.choices[0].message.content;
     } catch (error: any) {
       console.error('OpenRouter API Error:', error);
-      
-      // Better error messages
-      if (error.response?.status === 401) {
-        return 'Invalid API key. Please check your NEXT_PUBLIC_OPENROUTER_API_KEY.';
-      }
-      if (error.response?.status === 429) {
-        return 'Rate limit exceeded. Please try again in a moment.';
-      }
-      
-      return marketMode 
+      return marketMode
         ? 'Market analysis temporarily unavailable. Please try again later.'
         : 'News analysis temporarily unavailable. Please try again later.';
     }
   }
 
-  async parseAndAnalyzeURL(url: string, marketMode = false): Promise<string> {
+  async parseAndAnalyzeURL(url: string, marketMode = false, model = 'google/gemini-2.0-flash-exp:free'): Promise<string> {
     try {
-      const analysis = await this.analyzeNews(`Analyze news from URL: ${url}`, marketMode);
+      // For demo purposes, we'll simulate URL parsing
+      // In production, you'd implement proper web scraping
+      const analysis = await this.analyzeNews(`Analyze news from URL: ${url}`, marketMode, model);
       return analysis;
     } catch (error) {
       console.error('URL parsing error:', error);
@@ -143,19 +130,46 @@ export class OpenRouterAPI {
   }
 }
 
-// ================================================================
-// Google News RSS Parser
-// ================================================================
+import { RSSService } from './rss';
 
+// Google News RSS Parser + Hybrid Engine
 export class NewsService {
+  private rssService: RSSService;
+
+  constructor() {
+    this.rssService = new RSSService();
+  }
+
   async getNewsByTopic(topic: string): Promise<NewsArticle[]> {
+    const lowerTopic = topic.toLowerCase();
+
+    // Use Hybrid RSS Engine for specific financial/market topics
+    if (['market', 'finance', 'economy', 'stocks', 'crypto', 'india', 'business'].some(t => lowerTopic.includes(t))) {
+      try {
+        if (lowerTopic.includes('india')) {
+          return await this.rssService.getNewsByCategory('india');
+        } else if (lowerTopic.includes('crypto')) {
+          return await this.rssService.getNewsByCategory('crypto');
+        } else if (lowerTopic.includes('tech')) {
+          return await this.rssService.getNewsByCategory('tech');
+        } else {
+          return await this.rssService.getAllNews(); // Mix of Global + India for general market queries
+        }
+      } catch (error) {
+        console.error('RSS Service failed, falling back to Google News:', error);
+        // Fallback to Google News below
+      }
+    }
+
     try {
       const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-US&gl=US&ceid=US:en`;
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
-      
+
+      // Using a CORS proxy for demo - in production, use your own proxy
+      const proxyUrl = `/api/rss?url=${encodeURIComponent(rssUrl)}`;
+
       const response = await axios.get(proxyUrl);
       const xmlData = response.data.contents;
-      
+
       return new Promise((resolve, reject) => {
         parseString(xmlData, (err, result) => {
           if (err) {
@@ -171,7 +185,7 @@ export class NewsService {
             articles.push({
               id: `google-${Date.now()}-${index}`,
               title: item.title?.[0] || 'No title',
-              description: item.description?.[0] || 'No description',
+              description: this.stripHtml(item.description?.[0] || 'No description'),
               url: item.link?.[0] || '',
               publishedAt: item.pubDate?.[0] || new Date().toISOString(),
               source: 'Google News',
@@ -189,16 +203,21 @@ export class NewsService {
     }
   }
 
+  private stripHtml(html: string): string {
+    if (!html) return '';
+    return html.replace(/<[^>]*>?/gm, '');
+  }
+
   private calculateSentiment(text: string): 'positive' | 'negative' | 'neutral' {
     if (!text) return 'neutral';
-    
+
     const positiveWords = ['gain', 'rise', 'up', 'increase', 'bull', 'growth', 'profit', 'success', 'boost', 'surge', 'advance', 'rally'];
     const negativeWords = ['loss', 'fall', 'down', 'decrease', 'bear', 'decline', 'deficit', 'crisis', 'drop', 'plunge', 'crash', 'slump'];
-    
+
     const lowerText = text.toLowerCase();
     const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;
     const negativeCount = negativeWords.filter(word => lowerText.includes(word)).length;
-    
+
     if (positiveCount > negativeCount) return 'positive';
     if (negativeCount > positiveCount) return 'negative';
     return 'neutral';
@@ -206,7 +225,7 @@ export class NewsService {
 
   private calculateMarketRelevance(text: string): number {
     if (!text) return 1;
-    
+
     const marketKeywords = [
       'stock', 'market', 'trading', 'investment', 'finance', 'economy',
       'earnings', 'revenue', 'profit', 'loss', 'shares', 'investor',
@@ -216,7 +235,7 @@ export class NewsService {
 
     const lowerText = text.toLowerCase();
     const matchCount = marketKeywords.filter(keyword => lowerText.includes(keyword)).length;
-    
+
     return Math.min(10, Math.max(1, matchCount + Math.floor(Math.random() * 3)));
   }
 
@@ -273,8 +292,8 @@ export class NewsService {
     };
 
     const topicKey = topic.toLowerCase().includes('tech') ? 'technology' :
-                    topic.toLowerCase().includes('market') ? 'market' : 'default';
-    
+      topic.toLowerCase().includes('market') ? 'market' : 'default';
+
     const selectedArticles = fallbackArticles[topicKey] || fallbackArticles.default;
 
     return selectedArticles.map((article, index) => ({
@@ -303,136 +322,192 @@ export class NewsService {
   }
 }
 
-// ================================================================
-// Alpha Vantage for Market Data (WITH RATE LIMITING!)
-// ================================================================
-
+// Finnhub & CoinGecko Market Data Service
 export class MarketDataService {
   private apiKey: string;
-  private baseURL = 'https://www.alphavantage.co/query';
+  private finnhubBaseURL = 'https://finnhub.io/api/v1';
+  private coingeckoBaseURL = 'https://api.coingecko.com/api/v3';
+  private cache = new Map<string, { data: MarketData, timestamp: number }>();
+  private CACHE_DURATION = 60 * 1000; // 60 seconds
 
   constructor() {
-    this.apiKey = API_KEYS.ALPHA_VANTAGE;
+    this.apiKey = API_KEYS.FINNHUB;
   }
 
   async getStockQuote(symbol: string): Promise<MarketData | null> {
-    // Check if API key is configured
-    if (!this.apiKey) {
-      console.warn('Alpha Vantage API key not configured');
-      return null;
+    // 1. Check Cache
+    const cached = this.cache.get(symbol);
+    if (cached && (Date.now() - cached.timestamp < this.CACHE_DURATION)) {
+      return cached.data;
     }
 
-    // ⭐ CHECK RATE LIMIT (25/day)
-    const { allowed, remaining, resetTime } = checkRateLimit(
-      STORAGE_KEYS.ALPHA_REQUESTS,
-      RATE_LIMITS.ALPHA_VANTAGE_DAILY
-    );
-
-    if (!allowed) {
-      throw new Error(
-        `⚠️ Alpha Vantage daily limit reached (25 requests/day). ` +
-        `Resets at ${resetTime}. Try again tomorrow!`
-      );
+    // Check if it's a crypto symbol (simple check)
+    if (['BTC', 'ETH', 'SOL', 'DOGE'].includes(symbol)) {
+      return this.getCryptoQuote(symbol);
     }
 
+    // Default to Finnhub for stocks
     try {
-      const response = await axios.get(this.baseURL, {
+      const response = await axios.get(`${this.finnhubBaseURL}/quote`, {
         params: {
-          function: 'GLOBAL_QUOTE',
-          symbol,
-          apikey: this.apiKey,
+          symbol: symbol,
+          token: API_KEYS.FINNHUB,
         },
       });
 
-      const quote = response.data['Global Quote'];
-      if (!quote) return null;
+      const data = response.data;
+      if (!data || !data.c) return null;
 
-      // ⭐ INCREMENT RATE LIMIT COUNTER (successful request)
-      incrementRateLimit(STORAGE_KEYS.ALPHA_REQUESTS);
-
-      return {
-        symbol: quote['01. symbol'],
-        price: parseFloat(quote['05. price']),
-        change: parseFloat(quote['09. change']),
-        changePercent: parseFloat(quote['10. change percent'].replace('%', '')),
-        volume: parseInt(quote['06. volume']),
-        lastUpdated: quote['07. latest trading day'],
+      const result: MarketData = {
+        symbol: symbol,
+        price: data.c, // Current price
+        change: data.d, // Change
+        changePercent: data.dp, // Percent change
+        volume: 0, // Finnhub quote doesn't return volume in free tier mostly
+        lastUpdated: new Date(data.t * 1000).toISOString(),
       };
-    } catch (error: any) {
-      console.error('Market data error:', error);
-      
-      // Better error messages
-      if (error.response?.status === 429) {
-        throw new Error('Rate limit exceeded. Please try again in a moment.');
-      }
-      
+
+      this.cache.set(symbol, { data: result, timestamp: Date.now() });
+      return result;
+    } catch (error) {
+      console.error(`Finnhub error for ${symbol}:`, error);
+      return null;
+    }
+  }
+
+  async getCryptoQuote(symbol: string): Promise<MarketData | null> {
+    const idMap: { [key: string]: string } = {
+      'BTC': 'bitcoin',
+      'ETH': 'ethereum',
+      'SOL': 'solana',
+      'DOGE': 'dogecoin',
+    };
+    const id = idMap[symbol];
+    if (!id) return null;
+
+    try {
+      const response = await axios.get(`${this.coingeckoBaseURL}/simple/price`, {
+        params: {
+          ids: id,
+          vs_currencies: 'usd',
+          include_24hr_change: 'true',
+          include_last_updated_at: 'true',
+        },
+      });
+
+      const data = response.data[id];
+      if (!data) return null;
+
+      const result: MarketData = {
+        symbol: symbol,
+        price: data.usd,
+        change: (data.usd * data.usd_24h_change) / 100, // Estimate change value
+        changePercent: data.usd_24h_change,
+        volume: 0,
+        lastUpdated: new Date(data.last_updated_at * 1000).toISOString(),
+      };
+
+      this.cache.set(symbol, { data: result, timestamp: Date.now() });
+      return result;
+    } catch (error) {
+      console.error(`CoinGecko error for ${symbol}:`, error);
       return null;
     }
   }
 
   async getTopStocks(): Promise<MarketData[]> {
-    const symbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'NVDA', 'META'];
-    const results: MarketData[] = [];
+    // Mix of Stocks (Finnhub) and Crypto (CoinGecko)
+    const stockSymbols = ['AAPL', 'MSFT', 'GOOGL', 'NVDA', 'TSLA'];
+    const cryptoSymbols = ['BTC', 'ETH'];
 
-    // Sequential requests to avoid overwhelming rate limit
-    for (const symbol of symbols) {
-      try {
-        const quote = await this.getStockQuote(symbol);
-        if (quote) results.push(quote);
-      } catch (error: any) {
-        // If rate limit hit, return what we have so far
-        if (error.message.includes('daily limit')) {
-          console.warn('Rate limit reached while fetching stocks');
-          break;
-        }
-      }
-    }
+    const stockPromises = stockSymbols.map(s => this.getStockQuote(s));
+    const cryptoPromises = cryptoSymbols.map(s => this.getCryptoQuote(s));
 
-    return results;
-  }
-
-  // Get remaining requests for today
-  getRemainingRequests(): { remaining: number; resetTime: string } {
-    const { remaining, resetTime } = checkRateLimit(
-      STORAGE_KEYS.ALPHA_REQUESTS,
-      RATE_LIMITS.ALPHA_VANTAGE_DAILY
-    );
-    return { remaining, resetTime };
+    const results = await Promise.all([...stockPromises, ...cryptoPromises]);
+    return results.filter(Boolean) as MarketData[];
   }
 }
 
-// ================================================================
+// FRED Economic Data Service
+export class EconomicDataService {
+  private apiKey: string;
+  private baseURL = 'https://api.stlouisfed.org/fred/series/observations';
+  // Use a CORS proxy because FRED doesn't support CORS for browser requests
+  private proxyURL = 'https://api.allorigins.win/get?url=';
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  async getIndicator(seriesId: string): Promise<any> {
+    try {
+      const url = `${this.baseURL}?series_id=${seriesId}&api_key=${this.apiKey}&file_type=json&limit=1&sort_order=desc`;
+      const response = await axios.get(`${this.proxyURL}${encodeURIComponent(url)}`);
+
+      const data = JSON.parse(response.data.contents);
+      if (!data.observations || data.observations.length === 0) return null;
+
+      return {
+        id: seriesId,
+        value: parseFloat(data.observations[0].value),
+        date: data.observations[0].date,
+      };
+    } catch (error) {
+      console.error(`FRED error for ${seriesId}:`, error);
+      return null;
+    }
+  }
+
+  async getKeyIndicators(): Promise<any[]> {
+    const indicators = [
+      { id: 'GDP', name: 'GDP' },
+      { id: 'CPIAUCSL', name: 'CPI (Inflation)' },
+      { id: 'UNRATE', name: 'Unemployment Rate' },
+      { id: 'FEDFUNDS', name: 'Fed Funds Rate' },
+    ];
+
+    const promises = indicators.map(ind => this.getIndicator(ind.id));
+    const results = await Promise.all(promises);
+
+    return results.map((res, index) => ({
+      ...indicators[index],
+      data: res
+    })).filter(item => item.data !== null);
+  }
+}
+
 // Enhanced Sentiment Analysis
 // ================================================================
 
 export function analyzeSentiment(text: string): 'positive' | 'negative' | 'neutral' {
   if (!text) return 'neutral';
-  
+
   const positiveWords = [
     'gain', 'rise', 'up', 'increase', 'bull', 'growth', 'profit', 'success',
     'boost', 'surge', 'advance', 'rally', 'strong', 'robust', 'optimistic',
     'confident', 'breakthrough', 'expansion', 'recovery', 'upward'
   ];
-  
+
   const negativeWords = [
     'loss', 'fall', 'down', 'decrease', 'bear', 'decline', 'deficit', 'crisis',
     'drop', 'plunge', 'crash', 'slump', 'weak', 'concern', 'worry', 'risk',
     'volatility', 'uncertainty', 'pressure', 'struggle', 'challenge'
   ];
-  
+
   const lowerText = text.toLowerCase();
   const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;
   const negativeCount = negativeWords.filter(word => lowerText.includes(word)).length;
-  
+
+  // Apply weight based on context
   let positiveWeight = positiveCount;
   let negativeWeight = negativeCount;
-  
+
   // Increase weight for financial terms
   if (lowerText.includes('earnings') || lowerText.includes('revenue')) {
     if (positiveCount > 0) positiveWeight *= 1.5;
     if (negativeCount > 0) negativeWeight *= 1.5;
   }
-  
+
   if (positiveWeight > negativeWeight) return 'positive';
   if (negativeWeight > positiveWeight) return 'negative';
   return 'neutral';

@@ -6,44 +6,72 @@ import { useStore } from '../../lib/store';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import { Loader2, MessageSquare } from 'lucide-react';
+import { useChatAPI } from '../../hooks/useChat';
 
 const ChatInterface = () => {
-  const { messages, isLoading, marketMode } = useStore();
+  const { messages, isLoading, marketMode, cryptoMode, clearMessages, setPendingExplanation, setSelectedAnalysis } = useStore();
+  const { sendMessage } = useChatAPI();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+
+  const scrollToBottom = (force = false) => {
+    if (!messagesEndRef.current) return;
+
+    const container = messagesEndRef.current.parentElement;
+    if (!container) return;
+
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+
+    if (force || isNearBottom) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // Only force scroll if the last message is from the user
+    // Otherwise, only scroll if they were already at the bottom
+    const lastMessage = messages[messages.length - 1];
+    scrollToBottom(lastMessage?.type === 'user');
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900">
-      {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
+    <div className="flex flex-col h-full bg-transparent">
+      {/* Header - Simplified to avoid double header with main layout */}
+      <div className="flex-shrink-0 p-4 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm lg:hidden">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-primary-500 to-accent-500 flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-primary-500 to-accent-500 flex items-center justify-center">
+              <MessageSquare className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                 NewsLens AI
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {marketMode ? 'Market Analysis Mode' : 'News Analysis Mode'}
-              </p>
             </div>
           </div>
-          {isLoading && (
-            <div className="flex items-center space-x-2 text-primary-500">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Analyzing...</span>
-            </div>
-          )}
         </div>
+      </div>
+
+      {/* Mode Indicator & Loading Status - Visible on Desktop */}
+      <div className="hidden lg:flex flex-shrink-0 px-6 py-3 items-center justify-between border-b border-gray-200/30 dark:border-gray-700/30">
+        <div className="flex items-center space-x-3">
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-gray-800/50 px-3 py-1 rounded-full border border-gray-200/50 dark:border-gray-700/50">
+            {marketMode ? '📊 Market Analysis Mode' : cryptoMode ? '₿ Crypto Advisory Mode' : '📰 News Analysis Mode'}
+          </span>
+          <button
+            onClick={() => useStore.getState().clearMessages()}
+            className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
+            title="Clear Chat History"
+          >
+            New Chat
+          </button>
+        </div>
+        {isLoading && (
+          <div className="flex items-center space-x-2 text-primary-500">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-sm font-medium">Analyzing...</span>
+          </div>
+        )}
       </div>
 
       {/* Messages Container */}
@@ -53,35 +81,50 @@ const ChatInterface = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center justify-center h-full text-center"
+              className="px-6 py-12 flex flex-col items-center justify-center max-w-4xl mx-auto text-center"
             >
-              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-primary-500 to-accent-500 flex items-center justify-center mb-4">
-                <MessageSquare className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Welcome to NewsLens AI
+              <motion.div
+                className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-primary-500 to-accent-600 flex items-center justify-center mb-8 shadow-2xl shadow-primary-500/20"
+                whileHover={{ rotate: 5, scale: 1.05 }}
+              >
+                <MessageSquare className="w-10 h-10 text-white" />
+              </motion.div>
+
+              <h3 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6 tracking-tight">
+                Analyze the news with <span className="bg-gradient-to-r from-primary-600 to-accent-600 dark:from-primary-400 dark:to-accent-500 bg-clip-text text-transparent">Intelligence</span>
               </h3>
-              <p className="text-gray-500 dark:text-gray-400 max-w-md">
-                {marketMode 
-                  ? 'Ask about news and I\'ll provide market analysis with trends, risks, and opportunities.'
-                  : 'Share a news link or ask about current events. I\'ll analyze and explain the news for you.'
+
+              <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mb-12 leading-relaxed">
+                {marketMode
+                  ? 'Real-time market impact analysis, trend detection, and opportunity scoring powered by NewsLens AI.'
+                  : cryptoMode
+                    ? 'Expert crypto market analysis, coin sentiment tracking, and investment opportunities.'
+                    : 'Get deep insights into global events. Share a link or ask about anything happening in the world.'
                 }
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6 max-w-2xl">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                 {[
-                  "What's the latest tech news?",
-                  "Analyze this article: [paste URL]",
-                  marketMode ? "Market impact of recent inflation data" : "Explain blockchain technology",
-                  marketMode ? "Which sectors are trending today?" : "Latest climate change news"
-                ].map((suggestion, index) => (
+                  { text: "What's the latest tech news?", icon: "🚀", show: !marketMode && !cryptoMode },
+                  { text: "Analyze this article: [paste URL]", icon: "🔗", show: !marketMode && !cryptoMode },
+                  { text: "Market impact of recent inflation data", icon: "📊", show: marketMode },
+                  { text: "Which sectors are trending today?", icon: "🔥", show: marketMode },
+                  { text: "Is Bitcoin a good buy right now?", icon: "💰", show: cryptoMode },
+                  { text: "Analyze Ethereum's recent price action", icon: "📉", show: cryptoMode }
+                ].filter(item => item.show).map((item, index) => (
                   <button
                     key={index}
-                    className="p-3 text-sm text-left bg-white/60 dark:bg-gray-800/60 rounded-xl border border-gray-200/50 dark:border-gray-700/50 hover:bg-white/80 dark:hover:bg-gray-800/80 backdrop-blur-sm transition-all duration-200"
+                    className="group relative p-4 text-left bg-white/50 dark:bg-gray-800/50 rounded-2xl border border-gray-200/50 dark:border-white/10 hover:bg-white dark:hover:bg-gray-800 transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/5"
                     onClick={() => {
-                      // Add to input (you'll implement this in ChatInput)
+                      // Insert query logic can be added here
                     }}
                   >
-                    {suggestion}
+                    <div className="flex items-center space-x-4">
+                      <span className="text-2xl">{item.icon}</span>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-primary-500 transition-colors">
+                        {item.text}
+                      </span>
+                    </div>
                   </button>
                 ))}
               </div>
