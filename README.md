@@ -5,7 +5,7 @@ A sophisticated AI-powered news analysis platform with market intelligence capab
 ## 🚀 Features
 
 ### Core Functionality
-- **AI-Powered News Analysis**: Leverages OpenRouter's Grok-4 Fast model for intelligent news interpretation
+- **AI-Powered News Analysis**: Leverages OpenRouter's Stepfun model for intelligent news interpretation
 - **Market Analysis Mode**: Professional market impact analysis with sector insights, risk assessment, and investment opportunities
 - **Real-time News Feed**: Integration with Google News RSS and optional NewsAPI.org
 - **Interactive Chat Interface**: Natural language interaction for news queries and analysis
@@ -299,9 +299,6 @@ For technical issues or feature requests:
 - [Live Demo](https://newslens-ai.vercel.app/)
 - [GitHub Repository](https://github.com/anugya22/newslens-ai.git)
 
-<img width="956" height="476" alt="image" src="https://github.com/user-attachments/assets/50a6e422-3093-4b99-9bc0-10c04cc66597" />
-<img width="502" height="422" alt="image" src="https://github.com/user-attachments/assets/f6ab6c7c-bd89-4408-b7a2-039c581a5898" />
-<img width="959" height="413" alt="image" src="https://github.com/user-attachments/assets/c9125fda-54c6-47b1-ac7b-86c985ccde58" />
 
 
 
