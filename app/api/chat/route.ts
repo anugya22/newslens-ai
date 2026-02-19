@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     try {
         const { message, model, marketMode, cryptoMode, portfolio } = await req.json();
 
-        const apiKey = process.env.OPENROUTER_API_KEY;
+        const apiKey = process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
         const siteName = 'NewsLens AI';
 
