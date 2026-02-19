@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
+export const dynamic = 'force-dynamic';
+
 // Simple in-memory cache
 const cache = new Map<string, { data: any, timestamp: number }>();
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
