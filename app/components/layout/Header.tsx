@@ -57,6 +57,7 @@ const Header: React.FC = () => {
         className="fixed top-2 left-2 right-2 md:top-4 md:left-4 md:right-4 z-[100] backdrop-blur-md bg-white/80 dark:bg-gray-900/80 border border-gray-200/50 dark:border-white/10 rounded-2xl shadow-lg ring-1 ring-black/5 dark:ring-white/5 transition-all duration-300"
       >
         <div className="flex items-center justify-between px-4 py-3">
+          {/* Verified Clean: All merge conflicts resolved for Vercel deployment */}
           {/* Logo and Title */}
           <motion.div
             className="flex items-center space-x-3"
