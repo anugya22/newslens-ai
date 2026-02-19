@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { MarketDataService } from '../../lib/apis';
 
-const marketService = new MarketDataService(process.env.FINNHUB_API_KEY || '');
+const marketService = new MarketDataService();
 
 export async function POST(req: NextRequest) {
     try {

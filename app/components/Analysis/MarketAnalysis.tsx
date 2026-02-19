@@ -57,12 +57,8 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
         className="bg-white dark:bg-gray-900 rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-<<<<<<< HEAD
-        <div className="p-8 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-900/20 dark:to-accent-900/20">
-=======
         {/* Header - Fixed at top */}
         <div className="shrink-0 p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-900/20 dark:to-accent-900/20 relative z-10">
->>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className={`p-3 rounded-xl border ${getSentimentColor(analysis.sentiment)}`}>
@@ -72,13 +68,8 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
                 <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">
                   Financial Advisory Analysis
                 </h2>
-<<<<<<< HEAD
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                  Comprehensive market impact assessment
-=======
                 <p className="text-gray-700 dark:text-gray-300 font-medium">
                   Expert market impact and crypto intelligence assessment
->>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
                 </p>
               </div>
             </div>
@@ -108,10 +99,6 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
           </div>
         </div>
 
-<<<<<<< HEAD
-        <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
-          <div className="p-8 space-y-8">
-=======
         {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-120px)] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700">
           <div className="p-6 space-y-8">
@@ -135,7 +122,6 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
             </motion.div>
 
             {/* Overview Cards */}
->>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
@@ -248,12 +234,8 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                         {sector.reasoning}
                       </p>
-<<<<<<< HEAD
-                      
-=======
 
                       {/* Stock Impacts */}
->>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
                       {sector.stocks && sector.stocks.length > 0 && (
                         <div className="space-y-2">
                           <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

@@ -220,7 +220,7 @@ export default function PortfolioPage() {
 
     // FIX: Memoize services to prevent infinite re-render loop
     const marketService = React.useMemo(() =>
-        new MarketDataService(process.env.NEXT_PUBLIC_FINNHUB_API_KEY || ''),
+        new MarketDataService(),
         []);
     const newsService = React.useMemo(() => new PortfolioNewsService(), []);
 

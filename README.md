@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # NewsLens AI - Intelligent News Analysis Platform
 
 A sophisticated AI-powered news analysis platform with market intelligence capabilities, built with Next.js 14, TypeScript, and Tailwind CSS.

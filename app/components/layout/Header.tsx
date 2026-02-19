@@ -56,16 +56,10 @@ const Header: React.FC = () => {
       <motion.header
         className="fixed top-2 left-2 right-2 md:top-4 md:left-4 md:right-4 z-[100] backdrop-blur-md bg-white/80 dark:bg-gray-900/80 border border-gray-200/50 dark:border-white/10 rounded-2xl shadow-lg ring-1 ring-black/5 dark:ring-white/5 transition-all duration-300"
       >
-<<<<<<< HEAD
-        <div className="flex items-center justify-between px-6 py-4">
-          <motion.div 
-            className="flex items-center space-x-4"
-=======
         <div className="flex items-center justify-between px-4 py-3">
           {/* Logo and Title */}
           <motion.div
             className="flex items-center space-x-3"
->>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
             whileHover={{ scale: 1.02 }}
           >
             <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500">
@@ -75,11 +69,7 @@ const Header: React.FC = () => {
               <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
                 NewsLens AI
               </h1>
-<<<<<<< HEAD
-              <p className="text-xs text-gray-400 mt-0.5">
-=======
               <p className="text-xs text-gray-500 dark:text-gray-400">
->>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
                 Intelligent News Analysis
               </p>
             </div>
@@ -95,11 +85,6 @@ const Header: React.FC = () => {
             >
               Market Mode
             </Button>
-<<<<<<< HEAD
-            
-            <div className="w-px h-6 bg-white/20 mx-2" />
-            
-=======
 
             <Button
               variant={cryptoMode ? 'primary' : 'ghost'}
@@ -113,7 +98,6 @@ const Header: React.FC = () => {
 
             <div className="w-px h-6 bg-gray-200 dark:bg-white/20" />
 
->>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
             <Button
               variant="ghost"
               size="sm"
@@ -250,16 +234,10 @@ const Header: React.FC = () => {
         </div>
       </motion.header>
 
-<<<<<<< HEAD
-      <APISettings 
-        isOpen={showSettings} 
-        onClose={() => setShowSettings(false)} 
-=======
       {/* Settings Modal */}
       <APISettings
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
->>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)
       />
 
       {showNotifications && (
