@@ -303,8 +303,9 @@ For technical issues or feature requests:
 
 
 *NewsLens AI - Transforming how you understand the news and markets*
-=======
-# NewsLens AI 🧠📈
+
+---
+
 
 **Intelligent Portfolio Tracking & Risk-Aware News Analysis**
 
@@ -368,4 +369,3 @@ NewsLens AI features three distinct analysis modes to tailor the intelligence to
 
 ---
 
->>>>>>> 0e94cb4 (Cleanup news fetching logic, AI modes, email alerts, and project docs for Vercel deployment)

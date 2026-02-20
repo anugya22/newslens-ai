@@ -1,29 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
 import { MarketDataService } from '../../lib/apis';
+
+export const dynamic = 'force-dynamic';
 
 const marketService = new MarketDataService();
 
 export async function POST(req: NextRequest) {
     try {
-        const { message, model, marketMode, cryptoMode, portfolio } = await req.json();
+        const body = await req.json();
+        const { message, model, marketMode, cryptoMode, portfolio } = body;
 
+        // Vercel environment variables check
         const apiKey = process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
         const siteName = 'NewsLens AI';
 
+        console.log('--- CHAT API DEBUG ---');
+        console.log('API Route called successfully');
+        console.log('API Key configured:', !!apiKey);
+        console.log('Origin:', req.headers.get('origin'));
+        console.log('Model requested:', model);
+
         if (!apiKey) {
-            console.error('CRITICAL: OpenRouter API Key is missing in process.env');
+            console.error('CRITICAL: OpenRouter API Key is missing');
             return NextResponse.json(
                 { error: 'OpenRouter API Key not configured on server' },
                 { status: 500 }
             );
         }
-
-        console.log('--- CHAT REQUEST ---');
-        console.log('Model:', model);
-        console.log('MarketMode:', marketMode, 'CryptoMode:', cryptoMode);
-        console.log('API Key Present:', !!apiKey);
 
         if (!message) {
             return NextResponse.json({ error: 'Message is required' }, { status: 400 });
@@ -36,13 +40,9 @@ export async function POST(req: NextRequest) {
 
         // --- SMART MODE & CRYPTO MODE LOGIC ---
 
-        // 1. Intent Detection: Check if user is asking for specific analysis
-        // Regex for Stocks (e.g., AAPL, $TSLA, (NVDA)) and Crypto (BTC, ETH)
-        // Added 'i' flag for case-insensitivity
         const stockRegex = /\b[a-z]{2,5}\b|\$[a-z]{2,5}|\(([a-z]{2,5})\)/gi;
         const cryptoKeywords = ['bitcoin', 'btc', 'ethereum', 'eth', 'solana', 'sol', 'doge', 'crypto', 'xrp', 'cardano'];
 
-        // Ticker Normalization Map
         const tickerMap: { [key: string]: string } = {
             'apple': 'AAPL',
             'nvidia': 'NVDA',
@@ -58,27 +58,22 @@ export async function POST(req: NextRequest) {
         let matches = message.match(stockRegex);
         const isCryptoQuery = cryptoKeywords.some(k => message.toLowerCase().includes(k));
 
-        // Detect named stocks from the map
         const namedTickers = Object.entries(tickerMap)
             .filter(([name]) => message.toLowerCase().includes(name))
             .map(([_, ticker]) => ticker);
 
-        // Sanitize matches (remove $, brackets, etc.) and normalize to uppercase
         let uniqueTickers: string[] = [];
         if (matches || namedTickers.length > 0) {
             const rawMatches = (matches || []).map((m: string) => m.replace(/[()$]/g, '').toUpperCase());
             uniqueTickers = Array.from(new Set([...rawMatches, ...namedTickers]));
         }
 
-        // Determine if we should fetch real data
         if (marketMode || cryptoMode) {
-            // If tickers are detected, we ALWAYS want to show analysis even if quote fetch fails
             if (uniqueTickers.length > 0 || isCryptoQuery) {
                 showAnalysis = true;
                 detectedTicker = uniqueTickers[0] || '';
             }
 
-            // Prioritize Crypto Mode Logic
             if (cryptoMode && (uniqueTickers.length > 0 || isCryptoQuery)) {
                 const coin = message.toLowerCase().includes('btc') ? 'BTC' :
                     message.toLowerCase().includes('eth') ? 'ETH' :
@@ -86,22 +81,18 @@ export async function POST(req: NextRequest) {
                             message.toLowerCase().includes('doge') ? 'DOGE' :
                                 uniqueTickers[0] || 'BTC';
 
-                console.log(`Fetching CRYPTO data for ${coin}...`);
                 try {
                     const quote = await marketService.getCryptoQuote(coin);
                     if (quote && quote.price) {
                         const changeStr = quote.changePercent ? quote.changePercent.toFixed(2) : '0.00';
                         marketDataContext = `\n\nREAL-TIME CRYPTO DATA for ${coin}: Price: $${quote.price}, Change: ${changeStr}%`;
-                        detectedTicker = `BINANCE:${coin}USDT`; // TradingView format
+                        detectedTicker = `BINANCE:${coin}USDT`;
                     }
                 } catch (err) {
                     console.error('Crypto Fetch Error:', err);
-                    // showAnalysis remains true so buttons/charts still show
                 }
             }
-            // Standard Market Mode Logic (Supports multiple tickers)
             else if (marketMode && uniqueTickers.length > 0) {
-                // Fetch data for the first 3 tickers to avoid hitting rate limits too hard
                 const tickersToFetch = uniqueTickers.slice(0, 3);
                 const dataPromises = tickersToFetch.map(ticker => marketService.getStockQuote(ticker));
 
@@ -122,12 +113,10 @@ export async function POST(req: NextRequest) {
                     }
                 } catch (err) {
                     console.error('Stock Fetch Error:', err);
-                    // showAnalysis remains true
                 }
             }
         }
 
-        // 2. System Prompt Config
         let systemPrompt = `You are NewsLens AI, a helpful news assistant. ${portfolio && portfolio.length > 0 ? `The user holds these assets: [${portfolio.join(', ')}]. Prioritize news impacting these stocks.` : ''}`;
 
         if (cryptoMode) {
@@ -152,12 +141,18 @@ export async function POST(req: NextRequest) {
              - Do NOT output raw JSON or code snippets in your response. Focus on text analysis.`;
         }
 
-
-        // 3. AI Call
         const selectedModel = model || 'openrouter/free';
-        const response = await axios.post(
-            'https://openrouter.ai/api/v1/chat/completions',
-            {
+
+        // Switching to native fetch for better Next.js compatibility on Vercel
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': siteUrl,
+                'X-Title': siteName,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
                 model: (selectedModel && selectedModel.includes('deepseek')) ? 'stepfun/step-3.5-flash:free' : selectedModel,
                 messages: [
                     { role: 'system', content: systemPrompt },
@@ -165,31 +160,27 @@ export async function POST(req: NextRequest) {
                 ],
                 temperature: 0.7,
                 max_tokens: 2000,
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'HTTP-Referer': siteUrl,
-                    'X-Title': siteName,
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
+            }),
+        });
 
-        const aiContent = response.data.choices[0]?.message?.content || 'Failed to generate response.';
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error?.message || `OpenRouter responded with status ${response.status}`);
+        }
 
-        // 4. Construct Structured Analysis (The "Brain" connects to the "UI")
+        const data = await response.json();
+        const aiContent = data.choices[0]?.message?.content || 'Failed to generate response.';
+
         let marketAnalysis = undefined;
 
-        // Only generate the chart object if we have real data AND the AI confirmed analysis
         if (showAnalysis && (detectedTicker || uniqueTickers.length > 0)) {
             const isBullish = aiContent.toLowerCase().includes('bullish') || aiContent.toLowerCase().includes('positive');
             const isBearish = aiContent.toLowerCase().includes('bearish') || aiContent.toLowerCase().includes('negative');
 
             marketAnalysis = {
                 sentiment: isBullish ? 'bullish' : isBearish ? 'bearish' : 'neutral',
-                impactScore: 8, // Derived from high volatility
-                confidence: 90, // Real data = High confidence
+                impactScore: 8,
+                confidence: 90,
                 symbol: uniqueTickers[0] || detectedTicker,
                 symbols: uniqueTickers.length > 0 ? uniqueTickers : [detectedTicker],
                 sectors: [{
@@ -217,19 +208,12 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (error: any) {
-        // Enhanced Error Logging
         console.error('--- API ROUTE ERROR ---');
         console.error('Message:', error.message);
-        if (error.response) {
-            console.error('Status:', error.response.status);
-            console.error('Data:', JSON.stringify(error.response.data));
-        }
 
-        // Return detailed error to client for debugging
-        const errorMessage = error.response?.data?.error?.message || error.message || 'Internal Server Error';
         return NextResponse.json(
-            { error: `OpenRouter Error: ${errorMessage}` },
-            { status: error.response?.status || 500 }
+            { error: `Chat Error: ${error.message}` },
+            { status: 500 }
         );
     }
 }
