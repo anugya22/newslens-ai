@@ -21,8 +21,8 @@ export const API_KEYS = {
 
 // AI Model Configuration
 export const AI_CONFIG = {
-  // ⭐ BEST FREE MODEL - Unlimited, No tokens needed!
-  MODEL: 'google/gemini-2.0-flash-exp:free',
+  // ⭐ BEST FREE MODEL - StepFun
+  MODEL: 'stepfun/step-3.5-flash:free',
   TEMPERATURE: 0.7,
   MAX_TOKENS: 1000,
 };

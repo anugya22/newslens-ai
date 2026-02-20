@@ -79,7 +79,7 @@ export class OpenRouterAPI {
     this.apiKey = API_KEYS.OPENROUTER;
   }
 
-  async analyzeNews(content: string, marketMode = false, model = 'google/gemini-2.0-flash-exp:free'): Promise<string> {
+  async analyzeNews(content: string, marketMode = false, model = AI_CONFIG.MODEL): Promise<string> {
     const prompt = marketMode
       ? `As a "Financial Advisor" with full facts, analyze this news content. If the content is in a foreign language (e.g., Hindi), translate the key insights into English. Provide market impact analysis including:
          1. Overall market sentiment (bullish/bearish/neutral)
@@ -117,7 +117,7 @@ export class OpenRouterAPI {
     }
   }
 
-  async parseAndAnalyzeURL(url: string, marketMode = false, model = 'google/gemini-2.0-flash-exp:free'): Promise<string> {
+  async parseAndAnalyzeURL(url: string, marketMode = false, model = AI_CONFIG.MODEL): Promise<string> {
     try {
       // For demo purposes, we'll simulate URL parsing
       // In production, you'd implement proper web scraping

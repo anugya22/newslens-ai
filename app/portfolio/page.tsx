@@ -17,6 +17,7 @@ import { useStore } from '../lib/store';
 import toast from 'react-hot-toast';
 import { NotificationService } from '../lib/notifications';
 import axios from 'axios';
+import { AI_CONFIG } from '../lib/config';
 
 interface PortfolioItem {
     id: string;
@@ -224,50 +225,43 @@ export default function PortfolioPage() {
         []);
     const newsService = React.useMemo(() => new PortfolioNewsService(), []);
 
-    // AI Helper: Robust call with fallback models
-    // AI Helper: Robust call with fallback models and enforced plain text
+    // AI Helper: Robust call with enforced plain text
     const callAI = async (prompt: string, systemMsg: string = 'You are a professional financial assistant.') => {
         const apiKey = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
-        const models = [
-            'meta-llama/llama-3.3-70b-instruct:free',
-            'google/gemini-2.0-flash-exp:free',
-            'stepfun/step-3.5-flash:free'
-        ];
+        const model = AI_CONFIG.MODEL;
 
         // Enforce plain text formatting
         const formattingInstruction = " IMPORTANT: Provide your response in clean, plain text. Do NOT use markdown symbols like **bold**, ## headers, or - bullet points. Use standard paragraph formatting and numbering (1. 2. 3.) only if necessary.";
         const finalSystemMsg = systemMsg + formattingInstruction;
 
-        for (const model of models) {
-            let retries = 1;
-            while (retries >= 0) {
-                try {
-                    const res = await axios.post(
-                        'https://openrouter.ai/api/v1/chat/completions',
-                        {
-                            model: model,
-                            messages: [
-                                { role: 'system', content: finalSystemMsg },
-                                { role: 'user', content: prompt }
-                            ]
-                        },
-                        {
-                            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                            timeout: 15000
-                        }
-                    );
-                    if (res.data?.choices?.[0]?.message?.content) {
-                        return res.data.choices[0].message.content;
+        let retries = 2;
+        while (retries >= 0) {
+            try {
+                const res = await axios.post(
+                    'https://openrouter.ai/api/v1/chat/completions',
+                    {
+                        model: model,
+                        messages: [
+                            { role: 'system', content: finalSystemMsg },
+                            { role: 'user', content: prompt }
+                        ]
+                    },
+                    {
+                        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                        timeout: 20000
                     }
-                } catch (e: any) {
-                    console.warn(`Model ${model} failed:`, e.message);
-                    if (retries === 0) break;
-                    retries--;
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                );
+                if (res.data?.choices?.[0]?.message?.content) {
+                    return res.data.choices[0].message.content;
                 }
+            } catch (e: any) {
+                console.warn(`Model ${model} failed:`, e.message);
+                if (retries === 0) break;
+                retries--;
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
-        throw new Error('All AI models failed');
+        throw new Error('AI analysis failed. Please check your API key or connection.');
     };
 
     const handleGetAIAdvice = async (stock: string, newsTitle: string, newsDesc: string) => {

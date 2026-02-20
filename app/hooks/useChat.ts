@@ -3,8 +3,8 @@
 import { useState, useCallback } from 'react';
 import axios from 'axios';
 import { useStore } from '../lib/store';
-import { OpenRouterAPI } from '../lib/apis';
-import { ChatMessage, MarketAnalysis, SectorAnalysis, RiskFactor } from '../types';
+import { AI_CONFIG } from '../lib/config';
+import { ChatMessage, MarketAnalysis } from '../types';
 import toast from 'react-hot-toast';
 
 export const useChatAPI = () => {
@@ -36,7 +36,7 @@ export const useChatAPI = () => {
       // Call internal API route (keeps keys hidden)
       const response = await axios.post('/api/chat', {
         message: content,
-        model: settings.selectedModel || 'google/gemini-2.0-flash-exp:free', // Pass selected model
+        model: AI_CONFIG.MODEL, // Always use StepFun
         marketMode: marketMode,
         cryptoMode: cryptoMode
       });
@@ -91,7 +91,7 @@ export const useChatAPI = () => {
 
       const response = await axios.post('/api/chat', {
         message: `${message}\n\nPlease analyze this URL: ${url}`,
-        model: settings.selectedModel || 'google/gemini-2.0-flash-exp:free',
+        model: AI_CONFIG.MODEL, // Always use StepFun
         marketMode: marketMode
       });
 

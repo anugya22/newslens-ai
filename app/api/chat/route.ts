@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MarketDataService } from '../../lib/apis';
+import { AI_CONFIG } from '../../lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ const marketService = new MarketDataService();
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { message, model, marketMode, cryptoMode, portfolio } = body;
+        const { message, marketMode, cryptoMode, portfolio } = body;
 
         // Vercel environment variables check
         const apiKey = process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
         console.log('API Route called successfully');
         console.log('API Key configured:', !!apiKey);
         console.log('Origin:', req.headers.get('origin'));
-        console.log('Model requested:', model);
+        console.log('Model forced:', AI_CONFIG.MODEL);
 
         if (!apiKey) {
             console.error('CRITICAL: OpenRouter API Key is missing');
@@ -141,9 +142,7 @@ export async function POST(req: NextRequest) {
              - Do NOT output raw JSON or code snippets in your response. Focus on text analysis.`;
         }
 
-        const selectedModel = model || 'openrouter/free';
-
-        // Switching to native fetch for better Next.js compatibility on Vercel
+        // Strictly using AI_CONFIG.MODEL to ensure it is ALWAYS stepfun/step-3.5-flash:free as requested
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -153,7 +152,7 @@ export async function POST(req: NextRequest) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: (selectedModel && selectedModel.includes('deepseek')) ? 'stepfun/step-3.5-flash:free' : selectedModel,
+                model: AI_CONFIG.MODEL,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: finalMessage }
