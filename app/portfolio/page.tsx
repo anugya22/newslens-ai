@@ -12,6 +12,7 @@ import {
     BrainCircuit, X
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
+import { MarkdownRenderer } from '../components/ui/MarkdownRenderer';
 import { MarketDataService } from '../lib/apis';
 import { useStore } from '../lib/store';
 import toast from 'react-hot-toast';
@@ -1189,7 +1190,7 @@ export default function PortfolioPage() {
                             value={userProfile?.investment_type || 'long_term'}
                             onChange={async (e) => {
                                 const val = e.target.value;
-                                setUserProfile(prev => prev ? { ...prev, investment_type: val as any } : null);
+                                setUserProfile(prev => ({ ...(prev || {} as any), investment_type: val }));
                                 await supabase.from('profiles').update({ investment_type: val }).eq('id', user?.id);
                                 toast.success('Strategy updated');
                                 generatePortfolioInsight(items);
@@ -1205,7 +1206,7 @@ export default function PortfolioPage() {
                             value={userProfile?.risk_profile || 'moderate'}
                             onChange={async (e) => {
                                 const val = e.target.value;
-                                setUserProfile(prev => prev ? { ...prev, risk_profile: val as any } : null);
+                                setUserProfile(prev => ({ ...(prev || {} as any), risk_profile: val }));
                                 await supabase.from('profiles').update({ risk_profile: val }).eq('id', user?.id);
                                 toast.success('Risk profile updated');
                                 generatePortfolioInsight(items);
@@ -1797,11 +1798,11 @@ export default function PortfolioPage() {
                                             animate={{ opacity: 1, y: 0 }}
                                             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                         >
-                                            <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium shadow-sm transition-all ${msg.role === 'user'
+                                            <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium shadow-sm transition-all overflow-hidden ${msg.role === 'user'
                                                 ? 'bg-primary-600 text-white rounded-tr-sm'
                                                 : 'bg-gray-100 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700/50 rounded-tl-sm'
                                                 }`}>
-                                                <p className="whitespace-pre-wrap">{msg.content}</p>
+                                                <MarkdownRenderer content={msg.content} />
                                             </div>
                                         </motion.div>
                                     ))}
