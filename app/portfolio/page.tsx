@@ -470,7 +470,7 @@ export default function PortfolioPage() {
                     message: finalPrompt,
                     marketMode: false,
                     cryptoMode: false,
-                    sessionId: 'portfolio-chat',
+                    sessionId: '11111111-1111-1111-1111-111111111111',
                     userId: user?.id,
                     accessToken: session?.access_token,
                     // Give recent memory context
