@@ -485,30 +485,33 @@ export default function PortfolioPage() {
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let accumulatedContent = '';
+            let buffer = '';
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
 
                 for (const line of lines) {
-                    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                        try {
-                            const data = JSON.parse(line.slice(6));
-                            if (data.text) {
-                                accumulatedContent += data.text;
-                                // Update the last message in state with the new chunk
-                                setChatMessages(prev => {
-                                    const newMsgs = [...prev];
-                                    newMsgs[newMsgs.length - 1] = { role: 'assistant', content: accumulatedContent };
-                                    return newMsgs;
-                                });
-                            }
-                        } catch (e) {
-                            // ignore parse errors for partial chunks
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) continue;
+
+                    try {
+                        const data = JSON.parse(trimmedLine);
+                        if (data.type === 'content' && data.text) {
+                            accumulatedContent += data.text;
+                            // Update the last message in state with the new chunk
+                            setChatMessages(prev => {
+                                const newMsgs = [...prev];
+                                newMsgs[newMsgs.length - 1] = { role: 'assistant', content: accumulatedContent };
+                                return newMsgs;
+                            });
                         }
+                    } catch (e) {
+                        // ignore parse errors for partial chunks
                     }
                 }
             }

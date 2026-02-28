@@ -27,12 +27,12 @@ export default function LandingPage() {
     useEffect(() => {
         // Automatically redirect logged-in users to the dashboard
         if (user && !loading) {
-            router.push('/dashboard');
+            window.location.href = '/dashboard';
         }
-    }, [user, loading, router]);
+    }, [user, loading]);
 
-    if (loading) {
-        return <div className="min-h-screen bg-white dark:bg-[#212121]"></div>;
+    if (loading || user) {
+        return <div className="min-h-screen bg-white dark:bg-[#0B0C10]"></div>;
     }
 
     return (

@@ -275,18 +275,22 @@ export async function POST(req: NextRequest) {
                     controller.enqueue(encoder.encode(JSON.stringify({ type: 'metadata', data: marketAnalysis }) + '\n'));
                 }
 
+                let buffer = '';
+
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
 
                     for (const line of lines) {
-                        if (line === 'data: [DONE]') continue;
-                        if (line.startsWith('data: ')) {
+                        const trimmedLine = line.trim();
+                        if (trimmedLine === 'data: [DONE]') continue;
+                        if (trimmedLine.startsWith('data: ')) {
                             try {
-                                const parseData = JSON.parse(line.slice(6));
+                                const parseData = JSON.parse(trimmedLine.slice(6));
                                 if (parseData.choices && parseData.choices[0].delta && parseData.choices[0].delta.content) {
                                     const textChunk = parseData.choices[0].delta.content;
                                     aiContent += textChunk;

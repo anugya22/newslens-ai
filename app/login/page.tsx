@@ -230,12 +230,12 @@ export default function LoginPage() {
 
     useEffect(() => {
         if (user && !isLoading) {
-            router.push('/dashboard');
+            window.location.href = '/dashboard';
         }
-    }, [user, isLoading, router]);
+    }, [user, isLoading]);
 
 
-    if (isLoading) {
+    if (isLoading || user) {
         return (
             <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
                 <RefreshCw className="w-8 h-8 animate-spin text-primary-500" />
