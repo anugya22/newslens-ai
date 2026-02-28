@@ -246,19 +246,33 @@ const MarketAnalysis: React.FC<MarketAnalysisProps> = ({ analysis, isVisible, on
                               key={stockIndex}
                               className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded"
                             >
-                              <div>
-                                <span className="font-medium text-sm">{stock.symbol}</span>
-                                <span className="text-xs text-gray-500 ml-2">{stock.name}</span>
+                              <div className="flex flex-col">
+                                <div className="flex items-center">
+                                  <span className="font-bold text-sm text-gray-900 dark:text-white uppercase">{stock.symbol}</span>
+                                  <span className="text-[10px] text-gray-500 ml-2 truncate max-w-[80px]">{stock.name}</span>
+                                </div>
+                                {stock.price && stock.price > 0 && (
+                                  <span className="text-sm font-black text-primary-600 dark:text-primary-400 mt-0.5">
+                                    {(stock.currency || '$')}{stock.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                )}
                               </div>
-                              <div className="flex items-center space-x-2">
-                                <span
-                                  className={`text-sm font-medium ${stock.predictedChange > 0 ? 'text-green-600' : 'text-red-600'
-                                    }`}
-                                >
-                                  {stock.predictedChange > 0 ? '+' : ''}{stock.predictedChange.toFixed(1)}%
-                                </span>
-                                <span className="text-xs text-gray-400">
-                                  {stock.confidence}%
+                              <div className="flex flex-col items-end">
+                                <div className="flex items-center space-x-2">
+                                  <span
+                                    className={`text-sm font-bold px-1.5 py-0.5 rounded ${stock.predictedChange > 0
+                                      ? 'text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/30'
+                                      : 'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30'
+                                      }`}
+                                  >
+                                    {stock.predictedChange > 0 ? '+' : ''}{stock.predictedChange.toFixed(2)}%
+                                  </span>
+                                  <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500">
+                                    {stock.confidence}% Conf.
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 italic line-clamp-1">
+                                  {stock.reasoning}
                                 </span>
                               </div>
                             </div>

@@ -211,24 +211,6 @@ const ChatInput = () => {
           accept=".txt,.pdf,.doc,.docx,.jpg,.jpeg,.png"
         />
       </form>
-
-      {/* Loading Indicator */}
-      {isLoading && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-center py-2"
-        >
-          <div className="flex items-center space-x-2 text-primary-500">
-            <div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-            <div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-            <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
-            <span className="text-sm ml-2">
-              {marketMode ? 'Analyzing market impact...' : 'Processing news...'}
-            </span>
-          </div>
-        </motion.div>
-      )}
     </div>
   );
 };

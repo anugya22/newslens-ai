@@ -32,6 +32,7 @@ interface AppStore {
   selectedArticle: NewsArticle | null;
   selectedAnalysis: any | null;
   pendingExplanation: string | null;
+  showLimitModal: boolean;
 
   setLoading: (loading: boolean) => void;
   setSidebarOpen: (open: boolean) => void;
@@ -40,6 +41,7 @@ interface AppStore {
   setCryptoMode: (mode: boolean) => void;
   setSelectedArticle: (article: NewsArticle | null) => void;
   setSelectedAnalysis: (analysis: any | null) => void;
+  setShowLimitModal: (show: boolean) => void;
   setPendingExplanation: (text: string | null) => void;
 
   // Session
@@ -104,6 +106,7 @@ export const useStore = create<AppStore>()(
       selectedArticle: null,
       selectedAnalysis: null,
       pendingExplanation: null,
+      showLimitModal: false,
 
       // Session
       sessionId: generateSessionId(),
@@ -117,6 +120,7 @@ export const useStore = create<AppStore>()(
       setSelectedArticle: (article) => set({ selectedArticle: article }),
       setSelectedAnalysis: (analysis) => set({ selectedAnalysis: analysis }),
       setPendingExplanation: (text) => set({ pendingExplanation: text }),
+      setShowLimitModal: (show) => set({ showLimitModal: show }),
     }),
     {
       name: 'newslens-storage',

@@ -43,31 +43,39 @@ export default function Home() {
       .find(msg => msg.type === 'user');
 
     if (latestUserMessage) {
-      const content = latestUserMessage.content;
+      const content = latestUserMessage.content.toLowerCase();
 
-      // 1. Look for explicit stock symbols/crypto (uppercase, 2-5 chars, maybe starting with $)
-      const tickerMatch = content.match(/\b[A-Z]{2,5}\b/g) || content.match(/\$[A-Za-z]{2,5}/g);
+      // 1. Priority: Check if message contains any key from our global ticker map
+      const knownSymbols = [
+        'bajaj', 'reliance', 'nifty', 'sensex', 'hdfc', 'tata', 'tcs',
+        'bitcoin', 'ethereum', 'gold', 'crude', 'apple', 'nvidia', 'tesla',
+        'zomato', 'paytm', 'adani', 'infosys'
+      ];
 
+      for (const symbol of knownSymbols) {
+        if (content.includes(symbol)) return symbol;
+      }
+
+      // 2. Look for explicit stock symbols/crypto (uppercase, 2-5 chars, maybe starting with $)
+      const tickerMatch = latestUserMessage.content.match(/\b[A-Z]{2,5}\b/g) || latestUserMessage.content.match(/\$[A-Za-z]{2,5}/g);
       if (tickerMatch && tickerMatch.length > 0) {
         return tickerMatch[0].replace('$', '');
       }
 
-      // 2. Fallback: Extract the MOST meaningful keyword
+      // 3. Fallback: Extract the MOST meaningful keyword
       const stopWords = [
         'what', 'when', 'where', 'price', 'news', 'about', 'analysis',
         'latest', 'whats', 'tell', 'show', 'find', 'search', 'give',
-        'please', 'hows', 'does', 'with', 'mode', 'chat', 'know', 'today'
+        'please', 'hows', 'does', 'with', 'mode', 'chat', 'know', 'today',
+        'compared', 'looking', 'today', 'than', 'more', 'less', 'versus', 'market'
       ];
 
       const words = content
-        .toLowerCase()
         .replace(/[^\w\s]/g, ' ') // Replace punctuation with space
         .split(/\s+/)
         .filter(word => word.length > 3 && !stopWords.includes(word));
 
       if (words.length > 0) {
-        // Sort by length (descending) to pick more specific terms (e.g. "technology" over "whats")
-        // and avoid common short glue words
         const sortedWords = [...words].sort((a, b) => b.length - a.length);
         return sortedWords[0];
       }
@@ -95,7 +103,6 @@ export default function Home() {
   return (
     <div className="h-[100dvh] flex overflow-hidden bg-transparent text-slate-900 dark:text-white transition-colors duration-300 relative">
       {/* Background Pattern & Gradient Orb */}
-      <div className="fixed inset-0 opacity-10 bg-[url('/noise.svg')] mix-blend-overlay pointer-events-none" />
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary-600/20 dark:bg-indigo-900/40 blur-[120px] rounded-full pointer-events-none -z-10" />
 
       {/* Header */}

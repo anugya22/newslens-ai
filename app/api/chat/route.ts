@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { MarketDataService } from '../../lib/apis';
+import { MarketDataService, EconomicDataService } from '../../lib/apis';
 import { AI_CONFIG } from '../../lib/config';
 import { Redis } from '@upstash/redis';
 import { Ratelimit } from '@upstash/ratelimit';
@@ -60,9 +60,47 @@ export async function POST(req: NextRequest) {
         let showAnalysis = false;
         let detectedTicker = '';
 
+        const toTradingViewSymbol = (ticker: string) => {
+            if (!ticker) return 'NASDAQ:AAPL';
+            const t = ticker.toUpperCase();
+
+            // Indices
+            if (t.startsWith('^')) {
+                if (t === '^NSEI' || t === 'NIFTY') return 'NSE:NIFTY';
+                if (t === '^BSESN' || t === 'SENSEX') return 'BSE:SENSEX';
+                if (t === '^NSEBANK') return 'NSE:BANKNIFTY';
+                if (t === '^GSPC') return 'SPY';
+                if (t === '^IXIC') return 'NASDAQ:IXIC';
+                if (t === '^DJI') return 'DJI';
+                return t.substring(1);
+            }
+
+            // Crypto
+            if (t.includes('USDT') || t.includes('BTC') || t.includes('ETH')) {
+                if (!t.includes(':')) return `BINANCE:${t}${t.includes('USDT') ? '' : 'USDT'}`;
+                return t;
+            }
+
+            // Indian Stocks (.NS for Alpha Vantage)
+            if (t.endsWith('.NS')) return `NSE:${t.replace('.NS', '').replace('-', '_')}`;
+            if (t.endsWith('.BO')) return `BSE:${t.replace('.BO', '').replace('-', '_')}`;
+            if (t.endsWith('.NSE')) return `NSE:${t.replace('.NSE', '').replace('-', '_')}`;
+            if (t.endsWith('.BSE')) return `BSE:${t.replace('.BSE', '').replace('-', '_')}`;
+
+            // Common US Stocks (Add exchange prefix if missing)
+            const usStocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'NFLX', 'AMD', 'INTC'];
+            if (usStocks.includes(t)) return `NASDAQ:${t}`;
+
+            // LSE
+            if (t.endsWith('.L')) return `LSE:${t.replace('.L', '')}`;
+
+            return t; // Fallback
+        };
+
         // --- SMART MODE & CRYPTO MODE LOGIC ---
-        // Matches $AAPL or strictly 2+ uppercase letters (ignores generic lowercase words like 'price')
-        const stockRegex = /\$[a-zA-Z]{2,10}\b|\b[A-Z]{2,10}\b/g;
+        // Matches $AAPL or strictly 2-8 uppercase letters (ignores common business suffixes)
+        const stockRegex = /\$[a-zA-Z]{2,10}\b|\b[A-Z]{2,8}\b/g;
+        const tickerStopWords = ['INC', 'LLC', 'LTD', 'PLC', 'CORP', 'CORPN', 'USA', 'AND', 'FOR', 'YOU', 'CAN', 'THE', 'ARE'];
         const cryptoKeywords = ['bitcoin', 'btc', 'ethereum', 'eth', 'solana', 'sol', 'dogecoin', 'doge', 'crypto', 'xrp', 'cardano', 'ada', 'binance', 'bnb', 'polkadot', 'dot', 'chainlink', 'link', 'polygon', 'matic'];
 
         const tickerMap: { [key: string]: string } = {
@@ -75,6 +113,41 @@ export async function POST(req: NextRequest) {
             'amazon': 'AMZN',
             'meta': 'META',
             'netflix': 'NFLX',
+            'nifty': '^NSEI',
+            'sensex': '^BSESN',
+            'banknifty': '^NSEBANK',
+            'sp500': '^GSPC',
+            's&p 500': '^GSPC',
+            'sp 500': '^GSPC',
+            'nasdaq': '^IXIC',
+            'nasdaq 100': '^IXIC',
+            'dow': '^DJI',
+            'dow jones': '^DJI',
+            'gold': 'GC=F',
+            'crude': 'CL=F',
+            'oil': 'CL=F',
+            // Indian Blue-chips
+            'bajaj': 'BAJAJ-AUTO.NS',
+            'bajaj auto': 'BAJAJ-AUTO.NS',
+            'bajaj finserv': 'BAJAJFINSV.NS',
+            'finserv': 'BAJAJFINSV.NS',
+            'reliance': 'RELIANCE.NS',
+            'hdfc': 'HDFCBANK.NS',
+            'tata': 'TCS.NS',
+            'tcs': 'TCS.NS',
+            'infosys': 'INFY.NS',
+            'infy': 'INFY.NS',
+            'icici': 'ICICIBANK.NS',
+            'sbi': 'SBIN.NS',
+            'itc': 'ITC.NS',
+            'airtel': 'BHARTIARTL.NS',
+            'axis': 'AXISBANK.NS',
+            'wipro': 'WIPRO.NS',
+            'adani': 'ADANIENT.NS',
+            'kotak': 'KOTAKBANK.NS',
+            'maruti': 'MARUTI.NS',
+            'zomato': 'ZOMATO.NS',
+            'paytm': 'PAYTM.NS',
         };
 
         let matches = message.match(stockRegex);
@@ -87,10 +160,11 @@ export async function POST(req: NextRequest) {
         let uniqueTickers: string[] = [];
         if (matches || namedTickers.length > 0) {
             const rawMatches = (matches || []).map((m: string) => m.replace(/[()$]/g, '').toUpperCase());
-            // Filter out common stopwords that match 2-5 chars
-            const stopWords = ['HOW', 'WHY', 'WHAT', 'WHEN', 'WHO', 'THE', 'AND', 'FOR', 'ARE', 'YOU', 'CAN', 'OUT', 'DOING'];
-            uniqueTickers = Array.from(new Set([...rawMatches, ...namedTickers])).filter(t => !stopWords.includes(t));
+            uniqueTickers = Array.from(new Set([...rawMatches, ...namedTickers]))
+                .filter(t => t.length >= 2 && !tickerStopWords.includes(t));
         }
+
+        let fetchedQuotes: any[] = [];
 
         if (marketMode || cryptoMode) {
             if (uniqueTickers.length > 0 || isCryptoQuery) {
@@ -112,6 +186,7 @@ export async function POST(req: NextRequest) {
                 try {
                     const quote = await marketService.getCryptoQuote(coin);
                     if (quote && quote.price) {
+                        fetchedQuotes.push(quote);
                         const changeStr = quote.changePercent ? quote.changePercent.toFixed(2) : '0.00';
                         marketDataContext = `\n\nREAL-TIME CRYPTO DATA for ${coin}: Price: $${quote.price}, Change: ${changeStr}%`;
                         detectedTicker = `BINANCE:${coin}USDT`;
@@ -121,7 +196,12 @@ export async function POST(req: NextRequest) {
                 }
             }
             else if (marketMode && uniqueTickers.length > 0) {
-                const tickersToFetch = uniqueTickers.slice(0, 3);
+                // For common US/Global stocks without suffixes, try to guess or use directly
+                // If it's a known Indian name from the map, it already has .NSE
+                const tickersToFetch = uniqueTickers.slice(0, 3).map(t => {
+                    // If it's a simple 2-5 letter word, assume it's a ticker the user typed directly
+                    return t;
+                });
                 const dataPromises = tickersToFetch.map(ticker => marketService.getStockQuote(ticker));
 
                 try {
@@ -129,10 +209,18 @@ export async function POST(req: NextRequest) {
                     let dataStrings: string[] = [];
 
                     results.forEach((quote, idx) => {
-                        if (quote && quote.price) {
-                            const ticker = tickersToFetch[idx];
-                            const changeStr = quote.changePercent ? quote.changePercent.toFixed(2) : '0.00';
-                            dataStrings.push(`${ticker}: $${quote.price} (${changeStr}%)`);
+                        const ticker = tickersToFetch[idx];
+                        if (quote) {
+                            fetchedQuotes.push(quote);
+                            if (quote.price) {
+                                const changeStr = quote.changePercent ? quote.changePercent.toFixed(2) : '0.00';
+                                const currencyPrefix = ticker.includes('.NS') || ticker.includes('.BO') || ticker.includes('NSE') || ticker.includes('BSE') ? '₹' : '$';
+                                dataStrings.push(`${ticker}: ${currencyPrefix}${quote.price} (${changeStr}%)`);
+                                if (idx === 0) detectedTicker = ticker;
+                            } else {
+                                dataStrings.push(`${ticker}: Data fetch failed/unavailable`);
+                                if (idx === 0) detectedTicker = ticker;
+                            }
                         }
                     });
 
@@ -164,54 +252,89 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        let systemPrompt = `You are NewsLens AI, an elite, highly intelligent ecosystem assistant natively built into the NewsLens platform. 
-        You NEVER refer to yourself as a generic AI or say things like "I am a large language model." You exist strictly as NewsLens AI.
-
-        YOUR CAPABILITIES (If the user asks what you do, proudly list these features):
-        1. 🌍 **Global News Analysis**: You instantly analyze top global news events and explain their impact.
-        2. 📈 **Financial & Market Advisory**: You function as an expert financial advisor, helping users track assets and breaking down complex market trends.
-        3. ₿ **Crypto Tracker**: You provide real-time cryptocurrency analysis, technical indicators, and tracking.
-        4. 💼 **Portfolio Management**: You help users monitor their personal stock portfolios and evaluate risk profiles.
-        5. 🔗 **URL Parsing**: Users can paste ANY link into the chat, and you will instantly extract its contents, analyze it, and summarize it.
-        6. ✍️ **Content Generation**: You help users write articles, summarize documents, and brainstorm ideas based on current events.
-
-        CRITICAL FORMATTING RULES: 
-        1. STRONGLY ENCOURAGED: Use **bold** formatting for important entities, points, or headers. 
-        2. Keep paragraphs short and conversational. Do not use blocky unspaced text. Use nice spacing.
-        3. STRONGLY ENCOURAGED: Use relevant emojis to make the conversation lively and highly engaging!
-        4. Explain things in simple, jargon-free English.
-        5. Be EXTREMELY highly opinionated, confident, and persuasive. Do not use weak language.
-        
-        ${portfolio && portfolio.length > 0 ? `The user holds these assets: [${portfolio.join(', ')}]. Prioritize news impacting these stocks.` : ''}`;
-
-        if (cryptoMode) {
-            systemPrompt = `You are a "Crypto Analyst".
-             Style: Friendly, conversational, use some crypto slang (HODL, bullish) but keep it professional enough for clear advice.
-             Focus: Price action, sentiment, and basic technicals in extremely simple terms.
-             ${portfolio && portfolio.length > 0 ? `The user is tracking: [${portfolio.join(', ')}].` : ''}
-             ${marketDataContext}
-
-             CRITICAL INSTRUCTION:
-             - If Real-Time Data is provided above, USE IT and cite the exact price.
-             - Make your output highly scannable using **bold**, emojis, and short paragraphs to make the UI look very high-end and premium.`;
-        } else if (marketMode) {
-            systemPrompt = `You are a Professional Financial Advisor aiming to educate a beginner.
-             Style: Friendly, data-driven but extremely simple to understand. Talk like a friendly human advisor.
-             Focus: Market impact, simple macroeconomics.
-             ${portfolio && portfolio.length > 0 ? `The user is tracking: [${portfolio.join(', ')}].` : ''}
-             ${marketDataContext}
-
-             CRITICAL INSTRUCTION:
-             - If Real-Time Data is provided above, USE IT.
-             - Format text cleanly. Emphasize metrics with **bold text** and sprinkle in emojis for a conversational vibe.`;
+        // --- MACRO DATA FETCHING (FRED) ---
+        const economicService = new EconomicDataService((process.env.FRED_API_KEY || process.env.NEXT_PUBLIC_FRED_API_KEY || '') as string);
+        let macroContext = 'No macroeconomic data available.';
+        try {
+            const indicators = await economicService.getKeyIndicators();
+            if (indicators && indicators.length > 0) {
+                macroContext = indicators.map((ind: any) =>
+                    `${ind.name} (${ind.id}): ${ind.data.value}${ind.id === 'UNRATE' || ind.id === 'USREC' ? '%' : ''} (As of ${ind.data.date})`
+                ).join('\n');
+            }
+        } catch (err) {
+            console.error('FRED Fetch Error:', err);
         }
 
-        if (scrapedText) {
-            systemPrompt += `\n\n[LINK CONTENT EXTRACTION]: The user has provided a link. We ran an automated web scraper on it. Here is the article text extracted from the URL: \n"""\n${scrapedText}\n"""\n\nRead and base your analysis heavily on the text above when answering the user.`;
-        }
+        // --- LAYERED PROMPT ARCHITECTURE ---
+        const today = new Date().toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
 
         const messagesPayload = [
-            { role: 'system', content: systemPrompt },
+            {
+                role: 'system',
+                content: `You are NewsLens AI, an elite real-time financial intelligence and news analysis system.
+                You operate using live internet-connected data supplied by the system, including:
+                - Real-time financial market prices (Finnhub, Alpha Vantage, CoinGecko)
+                - Scraped news articles & RSS feeds
+                - Macroeconomic data (FRED)
+                
+                GLOBAL GROUNDING RULES:
+                1. NEVER estimate, infer, approximate, or hallucinate numerical values for ANY asset (US, India, Global, Crypto, Commodities).
+                2. Only use numerical market data explicitly provided in the context below. 
+                3. If verified data for a specific asset is missing or shows an error, state "Live exchange data for [Asset] could not be retrieved" rather than guessing.
+                4. ANALYSIS PERSISTENCE: If a ticker or asset is requested, always perform a deep qualitative analysis. Ensure your reasoning aligns with any quantitative data (prices/trends) provided in the context below. 
+                5. Never mention knowledge cutoff dates or training limitations. Assume provided data is the authoritative reality.
+                6. For portfolio assistance, analyze how macro trends like interest rates (FRED) or inflation impact specific assets.`
+            },
+            {
+                role: 'system',
+                content: `FORMATTING RULES (PREMIUM UI):
+                - Use clean, readable paragraphs.
+                - Use "•" for all bullet points.
+                - Use descriptive emojis for section headers.
+                - CRITICAL: Do NOT use markdown bold (**text**), markdown tables (|), vertical bars, triple dashes (---), or asterisks (*). 
+                - CRITICAL: NEVER output JSON, code blocks, or metadata tags like [type: "metadata"] in your response. Only output clean, natural language text.
+                - Maintain maximum whitespace for mobile readability.`
+            },
+            {
+                role: 'system',
+                content: `Current system date: ${today}. Authoritative time grounding.`
+            },
+            {
+                role: 'system',
+                content: `GLOBAL FINANCIAL CONTEXT:
+                
+                [MACRO DATA (FRED)]:
+                ${macroContext}
+                
+                [REAL-TIME MARKET DATA]:
+                ${marketDataContext || 'No market data retrieved from APIs.'}
+                
+                [NEWS/LINK CONTENT]:
+                ${scrapedText ? `\n${scrapedText}` : 'No recent scraped content available.'}
+                
+                [USER PORTFOLIO]:
+                ${portfolio && portfolio.length > 0 ? `[${portfolio.join(', ')}]` : 'No portfolio linked.'}`
+            },
+            {
+                role: 'system',
+                content: `ANALYTICAL COMMUNICATION & TRUST PRESENTATION LAYER:
+                OBJECTIVE: Improve user confidence, clarity, and friendliness while maintaining strict anti-hallucination behavior.
+                
+                RESPONSE STRUCTURE (MANDATORY):
+                1. 🔍 Insight: Provide an immediate high-level takeaway based on verified available data.
+                2. 📝 What We Know: Explain confirmed real-time information currently available from APIs or context.
+                3. ⏳ What Is Temporarily Missing: Briefly and calmly mention unavailable indicators WITHOUT sounding like failure.
+                4. 💡 What Still Can Be Concluded: Provide practical interpretation or directional insight using verified data.
+                
+                COMMUNICATION STYLE:
+                • Friendly, conversational fintech-assistant tone. Confident and helpful.
+                • Use phrases like: "Here’s what current data suggests", "Based on available market signals", "We can still observe that...".
+                • Never abruptly stop analysis due to missing data; continue partial analysis using verified information.
+                • Interactivity: End with a follow-up question (e.g., "Would you like a deeper technical breakdown?", "Want short-term vs long-term outlook?").`
+            },
             ...history,
             { role: 'user', content: finalMessage }
         ];
@@ -246,30 +369,54 @@ export async function POST(req: NextRequest) {
         // --- MARKET ANALYSIS METADATA GENERATION ---
         let marketAnalysis = undefined;
         if (showAnalysis && (detectedTicker || uniqueTickers.length > 0)) {
-            // Since we stream, we can't definitively know the LLM's full sentiment yet.
-            // But we can do a preliminary best guess based on the data or default to natural.
+            const symbols = uniqueTickers.length > 0 ? uniqueTickers : [detectedTicker];
+            const tvSymbols = symbols.map(t => toTradingViewSymbol(t));
+
+            // Map fetched quotes back to symbols
+            const stockItems = tvSymbols.map(s => {
+                const baseSymbol = s.includes(':') ? s.split(':')[1].replace('_', '-') : s;
+                const quote = fetchedQuotes.find(q =>
+                    q.symbol.toUpperCase().includes(baseSymbol.toUpperCase()) ||
+                    baseSymbol.toUpperCase().includes(q.symbol.toUpperCase())
+                );
+
+                const currency = s.startsWith('NSE:') || s.startsWith('BSE:') ? '₹' : '$';
+
+                return {
+                    symbol: s,
+                    name: s.split(':')[1] || s,
+                    price: quote?.price || 0,
+                    currency: currency,
+                    predictedChange: quote?.changePercent || 0,
+                    reasoning: quote?.price ? `Trading at ${quote.price}` : 'Real-time analysis',
+                    confidence: quote?.price ? 95 : 80
+                };
+            });
+
+            // Auto-sentiment based on primary quote
+            let sentiment = 'neutral';
+            const firstQuote = fetchedQuotes[0];
+            if (firstQuote && firstQuote.changePercent) {
+                if (firstQuote.changePercent > 0.5) sentiment = 'bullish';
+                else if (firstQuote.changePercent < -0.5) sentiment = 'bearish';
+            }
+
             marketAnalysis = {
-                sentiment: 'neutral',
-                impactScore: 8,
-                confidence: 85,
-                symbol: uniqueTickers[0] || detectedTicker,
-                symbols: uniqueTickers.length > 0 ? uniqueTickers : [detectedTicker],
+                sentiment: sentiment,
+                impactScore: Math.abs(firstQuote?.changePercent || 0) > 2 ? 9 : 7,
+                confidence: firstQuote?.price ? 95 : 85,
+                symbol: tvSymbols[0],
+                symbols: tvSymbols,
                 sectors: [{
-                    name: cryptoMode ? 'Cryptocurrency' : 'Technology',
-                    impact: 'neutral',
+                    name: cryptoMode ? 'Cryptocurrency' : 'Financial Services',
+                    impact: sentiment,
                     score: 9,
-                    reasoning: 'Live data analysis',
-                    stocks: (uniqueTickers.length > 0 ? uniqueTickers : [detectedTicker]).map(t => ({
-                        symbol: t,
-                        name: t,
-                        predictedChange: 0,
-                        reasoning: 'Real-time monitoring',
-                        confidence: 90
-                    }))
+                    reasoning: 'Live market monitoring',
+                    stocks: stockItems
                 }],
                 risks: [],
                 opportunities: [],
-                prediction: `Live tracking for ${uniqueTickers.join(', ')}.`
+                prediction: `Live tracking for ${tvSymbols.join(', ')}.`
             };
         }
 

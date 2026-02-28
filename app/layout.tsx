@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   appleWebApp: {
     statusBarStyle: 'default',
     title: 'NewsLens AI',
+    capable: true,
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
   },
   formatDetection: {
     telephone: false,

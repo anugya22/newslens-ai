@@ -7,6 +7,7 @@ import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import { Loader2, MessageSquare, Plus } from 'lucide-react';
 import { useChatAPI } from '../../hooks/useChat';
+import LimitModal from '../ui/LimitModal';
 
 const ChatInterface = () => {
   const { messages, isLoading, marketMode, cryptoMode, clearMessages, setPendingExplanation, setSelectedAnalysis } = useStore();
@@ -70,7 +71,7 @@ const ChatInterface = () => {
         {isLoading && (
           <div className="flex items-center space-x-2 text-primary-500">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-sm font-medium">Analyzing...</span>
+            <span className="text-sm font-medium">Analysing...</span>
           </div>
         )}
       </div>
@@ -143,6 +144,8 @@ const ChatInterface = () => {
       <div className="flex-shrink-0 p-4 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
         <ChatInput />
       </div>
+
+      <LimitModal />
     </div>
   );
 };

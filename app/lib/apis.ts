@@ -391,9 +391,10 @@ export class MarketDataService {
       }
     }
 
-    // Check if it's a crypto symbol (simple check)
-    if (['BTC', 'ETH', 'SOL', 'DOGE'].includes(symbol)) {
-      return this.getCryptoQuote(symbol);
+    // Check if it's a crypto symbol (Common IDs or explicitly flagged)
+    const cryptoTickers = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'ADA', 'DOT', 'LINK', 'MATIC', 'BNB'];
+    if (cryptoTickers.includes(symbol.toUpperCase()) || symbol.includes('USDT')) {
+      return this.getCryptoQuote(symbol.replace('USDT', ''));
     }
 
     // Default to Finnhub for stocks
@@ -403,6 +404,7 @@ export class MarketDataService {
           symbol: symbol,
           token: API_KEYS.FINNHUB,
         },
+        timeout: 30000,
       });
 
       const data = response.data;
@@ -438,7 +440,8 @@ export class MarketDataService {
           function: 'GLOBAL_QUOTE',
           symbol: symbol,
           apikey: API_KEYS.ALPHAVANTAGE,
-        }
+        },
+        timeout: 30000,
       });
 
       const alphaData = alphaResponse.data['Global Quote'];
@@ -494,6 +497,7 @@ export class MarketDataService {
           include_24hr_change: 'true',
           include_last_updated_at: 'true',
         },
+        timeout: 30000,
       });
 
       const data = response.data[id];
@@ -536,26 +540,50 @@ export class MarketDataService {
 export class EconomicDataService {
   private apiKey: string;
   private baseURL = 'https://api.stlouisfed.org/fred/series/observations';
-  // Use a CORS proxy because FRED doesn't support CORS for browser requests
-  private proxyURL = 'https://api.allorigins.win/get?url=';
+  private redis: Redis | null = null;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+    const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (redisUrl && redisToken) {
+      this.redis = new Redis({ url: redisUrl, token: redisToken });
+    }
   }
 
   async getIndicator(seriesId: string): Promise<any> {
+    const cacheKey = `fred_macro_${seriesId}`;
+
+    // 1. Check Redis Cache First
+    if (this.redis) {
+      try {
+        const cached = await this.redis.get<any>(cacheKey);
+        if (cached) return cached;
+      } catch (e) {
+        console.error(`Redis cache read error for ${seriesId}:`, e);
+      }
+    }
+
     try {
       const url = `${this.baseURL}?series_id=${seriesId}&api_key=${this.apiKey}&file_type=json&limit=1&sort_order=desc`;
-      const response = await axios.get(`${this.proxyURL}${encodeURIComponent(url)}`);
+      // Calling FRED directly from server-side route
+      const response = await axios.get(url, { timeout: 30000 });
 
-      const data = JSON.parse(response.data.contents);
-      if (!data.observations || data.observations.length === 0) return null;
+      if (!response.data.observations || response.data.observations.length === 0) return null;
 
-      return {
+      const result = {
         id: seriesId,
-        value: parseFloat(data.observations[0].value),
-        date: data.observations[0].date,
+        value: parseFloat(response.data.observations[0].value),
+        date: response.data.observations[0].date,
+        lastUpdated: new Date().toISOString()
       };
+
+      // 2. Save to Redis Cache (TTL: 6 hours = 21600 seconds)
+      if (this.redis) {
+        this.redis.set(cacheKey, result, { ex: 21600 }).catch(e => console.error(e));
+      }
+
+      return result;
     } catch (error) {
       console.error(`FRED error for ${seriesId}:`, error);
       return null;
@@ -564,10 +592,11 @@ export class EconomicDataService {
 
   async getKeyIndicators(): Promise<any[]> {
     const indicators = [
-      { id: 'GDP', name: 'GDP' },
-      { id: 'CPIAUCSL', name: 'CPI (Inflation)' },
+      { id: 'FEDFUNDS', name: 'Interest Rate' },
+      { id: 'CPIAUCSL', name: 'Inflation (CPI)' },
       { id: 'UNRATE', name: 'Unemployment Rate' },
-      { id: 'FEDFUNDS', name: 'Fed Funds Rate' },
+      { id: 'DGS10', name: '10Y Treasury Yield' },
+      { id: 'USREC', name: 'Recession Probability' },
     ];
 
     const promises = indicators.map(ind => this.getIndicator(ind.id));

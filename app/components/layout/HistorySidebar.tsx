@@ -157,7 +157,7 @@ export default function HistorySidebar() {
                     ${historySidebarOpen ? 'translate-x-0 lg:w-64 lg:opacity-100' : '-translate-x-full lg:hidden lg:w-0'}
                 `}
             >
-                <div className="flex flex-col h-full bg-transparent">
+                <div className="flex flex-col h-full bg-transparent lg:pt-24">
                     {/* Header & New Chat Button combined */}
                     <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-800">
                         <button

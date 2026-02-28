@@ -12,6 +12,7 @@ export const useChatAPI = () => {
   const {
     addMessage,
     setLoading,
+    setShowLimitModal,
     settings,
     marketMode,
     cryptoMode,
@@ -24,10 +25,18 @@ export const useChatAPI = () => {
 
   const sendMessage = useCallback(async (content: string) => {
     // Extract recent history BEFORE we add the new empty messages
-    const currentHistory = useStore.getState().messages.slice(-10).map(m => ({
-      role: m.type === 'user' ? 'user' : 'assistant',
-      content: m.content
-    }));
+    const currentHistory = useStore.getState().messages.slice(-10).map(m => {
+      // Clean Assistant history of any leaked JSON/metadata blocks
+      let cleanContent = m.content;
+      if (m.type === 'assistant') {
+        cleanContent = cleanContent.replace(/\[type:\s*["']metadata["']\][\s\S]*?\}\s*$/g, '').trim();
+        cleanContent = cleanContent.replace(/```json[\s\S]*?```/g, '').trim();
+      }
+      return {
+        role: m.type === 'user' ? 'user' : 'assistant',
+        content: cleanContent
+      };
+    });
 
     // Add user message
     const userMessage: ChatMessage = {
@@ -114,7 +123,14 @@ export const useChatAPI = () => {
 
     } catch (error: any) {
       console.error('Chat Error:', error);
-      toast.error(error.message || 'The AI service is temporarily unavailable');
+
+      const isLimitError = error.message?.toLowerCase().includes('limit exceeded') || error.status === 429;
+
+      if (isLimitError) {
+        setShowLimitModal(true);
+      } else {
+        toast.error(error.message || 'The AI service is temporarily unavailable');
+      }
 
       useStore.getState().updateMessage(aiMessageId, {
         content: "I'm having trouble connecting to my brain right now. Please check your connection or try again in a few moments.",
@@ -193,9 +209,15 @@ export const useChatAPI = () => {
         }
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('URL Analysis Error:', error);
-      toast.error('Failed to analyze URL');
+
+      const isLimitError = error.message?.toLowerCase().includes('limit exceeded');
+      if (isLimitError) {
+        setShowLimitModal(true);
+      } else {
+        toast.error('Failed to analyze URL');
+      }
       useStore.getState().updateMessage(aiMessageId, {
         content: "I'm having trouble analyzing this URL right now."
       });

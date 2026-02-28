@@ -43,6 +43,8 @@ export interface SectorAnalysis {
 export interface StockImpact {
   symbol: string;
   name: string;
+  price?: number;
+  currency?: string;
   predictedChange: number;
   reasoning: string;
   confidence: number;

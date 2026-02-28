@@ -84,7 +84,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               )}
               <div className="flex-1">
                 <div className="text-sm leading-relaxed">
-                  <MarkdownRenderer content={message.content} />
+                  {!isUser && !message.content ? (
+                    <div className="flex items-center space-x-2 py-2 px-1">
+                      <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                      <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                      <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce"></div>
+                    </div>
+                  ) : (
+                    <MarkdownRenderer content={message.content} />
+                  )}
                 </div>
               </div>
             </div>

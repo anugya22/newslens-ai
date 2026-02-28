@@ -246,7 +246,6 @@ export default function LoginPage() {
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 p-4 relative overflow-hidden">
             {/* Background elements */}
-            <div className="fixed inset-0 opacity-10 bg-[url('/noise.svg')] mix-blend-overlay pointer-events-none" />
             <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-500/20 rounded-full blur-[100px] pointer-events-none" />
 
             <div className="w-full max-w-md relative z-10">
