@@ -44,7 +44,7 @@ const AuthForm = () => {
                 redirectTo: `${window.location.origin}/reset-password`,
             });
             if (error) throw error;
-            toast.success('Password reset link sent to your email!');
+            toast.success('A link has been sent to your email id. Please click on it to log in back to app!', { duration: 6000 });
             setIsForgotPassword(false);
         } catch (error: any) {
             toast.error(error.message || 'Failed to send reset link');
