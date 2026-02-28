@@ -216,15 +216,8 @@ export class NewsService {
     if (!html) return '';
     // 1. Remove CDATA if still present
     let text = html.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
-    // 2. Remove script/style tags
-    text = text.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
 
-    // Google News specific: The description often contains 'href="..." target="_blank">Text</a>'.
-    // We want the text, not the tags.
-    // 3. Very aggressively remove ANY HTML tags, accounting for newlines within tags
-    text = text.replace(/<[^>]+>/g, '');
-
-    // 4. Unescape common entities
+    // 2. Unescape common entities FIRST (crucial, otherwise `<` is missed because it's encoded as `&lt;`)
     text = text
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
@@ -234,6 +227,12 @@ export class NewsService {
       .replace(/&nbsp;/g, ' ')
       .replace(/&middot;/g, '·')
       .replace(/&bull;/g, '•');
+
+    // 3. Remove script/style tags
+    text = text.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
+
+    // 4. Very aggressively remove ANY HTML tags, accounting for newlines within tags
+    text = text.replace(/<[^>]+>/g, '');
 
     // 5. Clean up extra whitespace and return a clean summary
     return text.replace(/\s+/g, ' ').trim();

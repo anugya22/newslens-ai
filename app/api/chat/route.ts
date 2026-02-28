@@ -302,7 +302,6 @@ export async function POST(req: NextRequest) {
                         }
                     }
                 }
-                controller.close();
 
                 // Save to Supabase DB if user is logged in
                 if (userId && sessionId && accessToken) {
@@ -339,6 +338,9 @@ export async function POST(req: NextRequest) {
                         console.error('Failed to save to Supabase:', dbErr);
                     }
                 }
+
+                // Close the stream ONLY AFTER the database completes
+                controller.close();
             }
         });
 
