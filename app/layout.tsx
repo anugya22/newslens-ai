@@ -8,7 +8,6 @@ export const metadata: Metadata = {
   description: 'Intelligent News Analysis',
   manifest: '/manifest.json',
   appleWebApp: {
-    capable: true,
     statusBarStyle: 'default',
     title: 'NewsLens AI',
   },
