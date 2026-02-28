@@ -30,7 +30,7 @@ if (redisUrl && redisToken) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { message, marketMode, cryptoMode, portfolio, sessionId, userId, accessToken, history = [] } = body;
+        const { message, marketMode, cryptoMode, portfolio, sessionId, userId, accessToken, history = [], model } = body;
 
         // Vercel environment variables check
         const apiKey = process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
@@ -213,7 +213,7 @@ export async function POST(req: NextRequest) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: AI_CONFIG.MODEL,
+                model: model || AI_CONFIG.MODEL,
                 messages: messagesPayload,
                 temperature: 0.7,
                 max_tokens: 2000,

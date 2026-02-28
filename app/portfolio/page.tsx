@@ -354,7 +354,7 @@ export default function PortfolioPage() {
     // AI Helper: Robust call with enforced plain text
     const callAI = async (prompt: string, systemMsg: string = 'You are a professional financial assistant.') => {
         const apiKey = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
-        const model = AI_CONFIG.MODEL;
+        const model = 'meta-llama/llama-3.3-70b-instruct:free';
 
         // Allow beautiful plain text and emojis, but no code blocks
         const formattingInstruction = " IMPORTANT: Be engaging and highly conversational! Use spacing and **bold text** to highlight key metrics. Use relevant emojis. You MAY use code blocks and raw markdown lists if appropriate.";
@@ -466,6 +466,7 @@ export default function PortfolioPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    model: 'meta-llama/llama-3.3-70b-instruct:free',
                     message: finalPrompt,
                     marketMode: false,
                     cryptoMode: false,
