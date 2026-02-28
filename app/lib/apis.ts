@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { parseString } from 'xml2js';
 import { NewsArticle, MarketAnalysis, MarketData, NewsSearchParams } from '../types';
 import { API_KEYS, AI_CONFIG, RATE_LIMITS, STORAGE_KEYS, isAPIConfigured } from './config';
+import { Redis } from '@upstash/redis';
 
 // ================================================================
 // RATE LIMITING HELPERS (LocalStorage - No Database Needed!)
@@ -163,40 +163,48 @@ export class NewsService {
 
     try {
       const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-US&gl=US&ceid=US:en`;
-
-      // Using a CORS proxy for demo - in production, use your own proxy
       const proxyUrl = `/api/rss?url=${encodeURIComponent(rssUrl)}`;
-
       const response = await axios.get(proxyUrl);
-      const xmlData = response.data.contents;
+      const xmlData = response.data.contents || response.data;
 
-      return new Promise((resolve, reject) => {
-        parseString(xmlData, (err, result) => {
-          if (err) {
-            console.error('XML parsing error:', err);
-            resolve(this.getRealisticFallbackNews(topic));
-            return;
-          }
+      const itemsMatch = typeof xmlData === 'string' ? xmlData.match(/<item>([\s\S]*?)<\/item>/g) : null;
 
-          const articles: NewsArticle[] = [];
-          const items = result.rss?.channel?.[0]?.item || [];
+      if (!itemsMatch) {
+        return this.getRealisticFallbackNews(topic);
+      }
 
-          items.slice(0, 10).forEach((item: any, index: number) => {
-            articles.push({
-              id: `google-${Date.now()}-${index}`,
-              title: item.title?.[0] || 'No title',
-              description: this.stripHtml(item.description?.[0] || 'No description'),
-              url: item.link?.[0] || '',
-              publishedAt: item.pubDate?.[0] || new Date().toISOString(),
-              source: 'Google News',
-              sentiment: this.calculateSentiment(item.title?.[0] + ' ' + item.description?.[0]),
-              marketRelevance: this.calculateMarketRelevance(item.title?.[0] + ' ' + item.description?.[0]),
-            });
-          });
+      const articles: NewsArticle[] = [];
+      const items = itemsMatch.slice(0, 10);
 
-          resolve(articles.length > 0 ? articles : this.getRealisticFallbackNews(topic));
+      for (let i = 0; i < items.length; i++) {
+        const itemXml = items[i];
+
+        const titleMatch = itemXml.match(/<title>([\s\S]*?)<\/title>/);
+        const linkMatch = itemXml.match(/<link>([\s\S]*?)<\/link>/);
+        const pubDateMatch = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+        const descMatch = itemXml.match(/<description>([\s\S]*?)<\/description>/);
+
+        const title = titleMatch ? titleMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim() : 'No title';
+        const url = linkMatch ? linkMatch[1].trim() : '';
+        const publishedAt = pubDateMatch ? pubDateMatch[1].trim() : new Date().toISOString();
+        let description = descMatch ? descMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim() : 'No description';
+        description = this.stripHtml(description);
+
+        const fullTextForSentiment = title + ' ' + description;
+
+        articles.push({
+          id: `google-${Date.now()}-${i}`,
+          title,
+          description,
+          url,
+          publishedAt,
+          source: 'Google News',
+          sentiment: this.calculateSentiment(fullTextForSentiment),
+          marketRelevance: this.calculateMarketRelevance(fullTextForSentiment)
         });
-      });
+      }
+
+      return articles.length > 0 ? articles : this.getRealisticFallbackNews(topic);
     } catch (error) {
       console.error('News fetch error:', error);
       return this.getRealisticFallbackNews(topic);
@@ -205,7 +213,25 @@ export class NewsService {
 
   private stripHtml(html: string): string {
     if (!html) return '';
-    return html.replace(/<[^>]*>?/gm, '');
+    // 1. Remove CDATA if still present
+    let text = html.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+    // 2. Remove script/style tags
+    text = text.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
+    // 3. Remove all other HTML tags
+    text = text.replace(/<[^>]*>?/gm, '');
+    // 4. Unescape common entities
+    text = text
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&middot;/g, '·')
+      .replace(/&bull;/g, '•');
+
+    // 5. Clean up extra whitespace and return a clean summary
+    return text.replace(/\s+/g, ' ').trim();
   }
 
   private calculateSentiment(text: string): 'positive' | 'negative' | 'neutral' {
@@ -327,18 +353,38 @@ export class MarketDataService {
   private apiKey: string;
   private finnhubBaseURL = 'https://finnhub.io/api/v1';
   private coingeckoBaseURL = 'https://api.coingecko.com/api/v3';
-  private cache = new Map<string, { data: MarketData, timestamp: number }>();
-  private CACHE_DURATION = 60 * 1000; // 60 seconds
+  private localCache = new Map<string, { data: MarketData, timestamp: number }>();
+  private CACHE_DURATION = 5 * 60 * 1000; // 5 minutes (local & redis)
+
+  private redis: Redis | null = null;
 
   constructor() {
     this.apiKey = API_KEYS.FINNHUB;
+    const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (redisUrl && redisToken) {
+      this.redis = new Redis({ url: redisUrl, token: redisToken });
+    }
   }
 
   async getStockQuote(symbol: string): Promise<MarketData | null> {
-    // 1. Check Cache
-    const cached = this.cache.get(symbol);
+    // 1. Check Local Node Cache
+    const cached = this.localCache.get(symbol);
     if (cached && (Date.now() - cached.timestamp < this.CACHE_DURATION)) {
       return cached.data;
+    }
+
+    // 2. Check Redis Edge Cache
+    if (this.redis) {
+      try {
+        const redisCached = await this.redis.get<MarketData>(`quote:${symbol}`);
+        if (redisCached) {
+          this.localCache.set(symbol, { data: redisCached, timestamp: Date.now() });
+          return redisCached;
+        }
+      } catch (e) {
+        console.error('Redis cache error:', e);
+      }
     }
 
     // Check if it's a crypto symbol (simple check)
@@ -356,21 +402,61 @@ export class MarketDataService {
       });
 
       const data = response.data;
-      if (!data || !data.c) return null;
+
+      // Finnhub sometimes returns 0 for non-US stocks. 
+      // If it's valid, set cache and return.
+      if (data && data.c && data.c > 0) {
+        const result: MarketData = {
+          symbol: symbol,
+          price: data.c, // Current price
+          change: data.d, // Change
+          changePercent: data.dp, // Percent change
+          volume: 0,
+          lastUpdated: new Date(data.t * 1000).toISOString(),
+        };
+
+        this.localCache.set(symbol, { data: result, timestamp: Date.now() });
+        if (this.redis) {
+          this.redis.set(`quote:${symbol}`, result, { ex: 300 }).catch(e => console.error(e));
+        }
+        return result;
+      }
+    } catch (error) {
+      console.warn(`Finnhub error/no data for ${symbol}. Falling back to Alpha Vantage...`);
+    }
+
+    // Fallback to Alpha Vantage (Good for Indian/Global stocks like RELIANCE.BSE)
+    if (!API_KEYS.ALPHAVANTAGE) return null;
+
+    try {
+      const alphaResponse = await axios.get(`https://www.alphavantage.co/query`, {
+        params: {
+          function: 'GLOBAL_QUOTE',
+          symbol: symbol,
+          apikey: API_KEYS.ALPHAVANTAGE,
+        }
+      });
+
+      const alphaData = alphaResponse.data['Global Quote'];
+      if (!alphaData || Object.keys(alphaData).length === 0) return null;
 
       const result: MarketData = {
         symbol: symbol,
-        price: data.c, // Current price
-        change: data.d, // Change
-        changePercent: data.dp, // Percent change
-        volume: 0, // Finnhub quote doesn't return volume in free tier mostly
-        lastUpdated: new Date(data.t * 1000).toISOString(),
+        price: parseFloat(alphaData['05. price']),
+        change: parseFloat(alphaData['09. change']),
+        changePercent: parseFloat(alphaData['10. change percent'].replace('%', '')),
+        volume: parseFloat(alphaData['06. volume'] || '0'),
+        lastUpdated: new Date().toISOString(),
       };
 
-      this.cache.set(symbol, { data: result, timestamp: Date.now() });
+      this.localCache.set(symbol, { data: result, timestamp: Date.now() });
+      if (this.redis) {
+        this.redis.set(`quote:${symbol}`, result, { ex: 300 }).catch(e => console.error(e));
+      }
       return result;
-    } catch (error) {
-      console.error(`Finnhub error for ${symbol}:`, error);
+
+    } catch (fallbackError) {
+      console.error(`Alpha Vantage fallback error for ${symbol}:`, fallbackError);
       return null;
     }
   }
@@ -382,8 +468,19 @@ export class MarketDataService {
       'SOL': 'solana',
       'DOGE': 'dogecoin',
     };
-    const id = idMap[symbol];
-    if (!id) return null;
+    const id = idMap[symbol] || symbol.toLowerCase();
+
+    // 1. Check Redis Edge Cache
+    if (this.redis) {
+      try {
+        const redisCached = await this.redis.get<MarketData>(`crypto:${symbol}`);
+        if (redisCached) {
+          return redisCached;
+        }
+      } catch (e) {
+        console.error('Redis cache error:', e);
+      }
+    }
 
     try {
       const response = await axios.get(`${this.coingeckoBaseURL}/simple/price`, {
@@ -407,7 +504,10 @@ export class MarketDataService {
         lastUpdated: new Date(data.last_updated_at * 1000).toISOString(),
       };
 
-      this.cache.set(symbol, { data: result, timestamp: Date.now() });
+      if (this.redis) {
+        // Set to expire in 5 minutes
+        this.redis.set(`crypto:${symbol}`, result, { ex: 300 }).catch(e => console.error(e));
+      }
       return result;
     } catch (error) {
       console.error(`CoinGecko error for ${symbol}:`, error);

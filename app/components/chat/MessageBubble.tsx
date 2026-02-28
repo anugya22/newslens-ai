@@ -129,10 +129,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                       <Activity className="w-3 h-3" />
                       <span>{sym} Live Chart</span>
                     </div>
-                    <div className="w-full h-[300px] rounded-2xl overflow-hidden border border-gray-200/50 dark:border-white/10 shadow-lg bg-white dark:bg-gray-800">
+                    <div className="w-full h-[450px] rounded-2xl overflow-hidden border border-gray-200/50 dark:border-white/10 shadow-lg bg-white dark:bg-gray-800">
                       <TradingViewWidget
                         symbol={sym}
-                        height={300}
+                        height={450}
                       />
                     </div>
                   </motion.div>

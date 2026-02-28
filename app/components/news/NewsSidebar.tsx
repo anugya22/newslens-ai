@@ -15,7 +15,7 @@ import { GlassCard, Badge, Button } from '../ui/Button';
 import { NewsArticle } from '../../types';
 import { useStore } from '../../lib/store';
 import { NewsService } from '../../lib/apis';
-
+import { SentimentHeatmap } from './SentimentHeatmap';
 
 interface NewsSidebarProps {
   relatedTopic?: string;
@@ -108,7 +108,7 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-6 p-6">
+    <div className="flex flex-col space-y-6 pt-6 px-6 pb-24">
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -140,9 +140,9 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.2 }}
-        className="flex-1"
+        className="flex-1 min-h-0"
       >
-        <GlassCard className="p-4 h-full">
+        <GlassCard className="p-4 flex flex-col h-auto">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               {relatedTopic ? `Latest: ${relatedTopic}` : 'Latest News'}
@@ -172,7 +172,15 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
               ))}
             </div>
           ) : (
-            <div className="h-full overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+            <div className="flex-1 space-y-4 pr-2">
+
+              {/* newly added Sentiment Heatmap */}
+              {news.length > 0 && (
+                <div className="mb-6">
+                  <SentimentHeatmap news={news} />
+                </div>
+              )}
+
               {news.map((article, index) => (
                 <motion.div
                   key={article.id}

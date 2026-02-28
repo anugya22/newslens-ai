@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { parseString } from 'xml2js';
 import { NewsArticle } from '../types';
 
 export interface RSSFeed {
@@ -84,38 +83,48 @@ export class RSSService {
                 throw new Error('Invalid response from proxy');
             }
 
-            const xmlData = response.data.contents;
+            const xmlData = response.data.contents || response.data;
+            const itemsMatch = typeof xmlData === 'string' ? xmlData.match(/<item>([\s\S]*?)<\/item>/g) : null;
 
-            return new Promise((resolve) => {
-                parseString(xmlData, (err, result) => {
-                    if (err || !result?.rss?.channel?.[0]?.item) {
-                        console.error(`Failed to parse feed ${feed.name}`, err);
-                        resolve([]);
-                        return;
-                    }
+            if (!itemsMatch) {
+                console.error(`Failed to parse feed ${feed.name}`);
+                return [];
+            }
 
-                    const items = result.rss.channel[0].item;
-                    const articles: NewsArticle[] = items.slice(0, 5).map((item: any, index: number) => {
-                        const fullContent = item['content:encoded']?.[0] || item.description?.[0] || '';
-                        // Remove HTML tags for cleaner text analysis later logic if needed, 
-                        // but keeping basic structure is okay for now.
+            const items = itemsMatch.slice(0, 5);
+            const articles: NewsArticle[] = [];
 
-                        return {
-                            id: `${feed.id}-${index}-${Date.now()}`,
-                            title: item.title?.[0] || 'No Title',
-                            description: this.cleanDescription(item.description?.[0] || ''),
-                            url: item.link?.[0],
-                            publishedAt: item.pubDate?.[0] || new Date().toISOString(),
-                            source: feed.name,
-                            sentiment: 'neutral', // Calculated later
-                            marketRelevance: 5, // Default
-                            content: fullContent // Store full content for AI analysis
-                        };
-                    });
+            for (let i = 0; i < items.length; i++) {
+                const itemXml = items[i];
+                const titleMatch = itemXml.match(/<title>([\s\S]*?)<\/title>/);
+                const linkMatch = itemXml.match(/<link>([\s\S]*?)<\/link>/);
+                const pubDateMatch = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+                const descMatch = itemXml.match(/<description>([\s\S]*?)<\/description>/);
+                const contentMatch = itemXml.match(/<content:encoded>([\s\S]*?)<\/content:encoded>/);
 
-                    resolve(articles);
+                const title = titleMatch ? titleMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim() : 'No Title';
+                const url = linkMatch ? linkMatch[1].trim() : '';
+                const publishedAt = pubDateMatch ? pubDateMatch[1].trim() : new Date().toISOString();
+
+                let rawDescription = descMatch ? descMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim() : '';
+                let rawContent = contentMatch ? contentMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim() : '';
+
+                const fullContent = rawContent || rawDescription || '';
+
+                articles.push({
+                    id: `${feed.id}-${i}-${Date.now()}`,
+                    title,
+                    description: this.cleanDescription(rawDescription),
+                    url,
+                    publishedAt,
+                    source: feed.name,
+                    sentiment: 'neutral',
+                    marketRelevance: 5,
+                    content: fullContent
                 });
-            });
+            }
+
+            return articles;
         } catch (error) {
             console.error(`Error fetching ${feed.name}:`, error);
             return [];

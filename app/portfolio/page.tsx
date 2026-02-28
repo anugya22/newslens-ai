@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -18,6 +18,7 @@ import toast from 'react-hot-toast';
 import { NotificationService } from '../lib/notifications';
 import axios from 'axios';
 import { AI_CONFIG } from '../lib/config';
+import { useRouter } from 'next/navigation';
 
 interface PortfolioItem {
     id: string;
@@ -47,17 +48,45 @@ interface PortfolioAlert {
 
 const AuthForm = () => {
     const [isLogin, setIsLogin] = useState(true);
+    const [isForgotPassword, setIsForgotPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const { signInWithEmail, signUpWithEmail } = useAuth();
 
+    const validatePassword = (pw: string) => {
+        const regex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+        return regex.test(pw);
+    };
+
     const toggleMode = () => {
         setIsLogin(!isLogin);
+        setIsForgotPassword(false);
         setEmail('');
         setPassword('');
         setConfirmPassword('');
+    };
+
+    const handleForgotPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!email) {
+            toast.error("Please enter your email address");
+            return;
+        }
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/reset-password`,
+            });
+            if (error) throw error;
+            toast.success('Password reset link sent to your email!');
+            setIsForgotPassword(false);
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to send reset link');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -66,6 +95,12 @@ const AuthForm = () => {
 
         if (!isLogin && password !== confirmPassword) {
             toast.error("Passwords do not match");
+            setLoading(false);
+            return;
+        }
+
+        if (!isLogin && !validatePassword(password)) {
+            toast.error("Password must be at least 8 characters long, contain 1 uppercase letter and 1 number.");
             setLoading(false);
             return;
         }
@@ -100,6 +135,40 @@ const AuthForm = () => {
         }
     };
 
+    if (isForgotPassword) {
+        return (
+            <form onSubmit={handleForgotPassword} className="space-y-4 text-left">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                    <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full px-4 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary-500"
+                        placeholder="your@email.com"
+                    />
+                </div>
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition disabled:opacity-50"
+                >
+                    {loading ? 'Sending...' : 'Send Reset Link'}
+                </button>
+                <div className="text-center">
+                    <button
+                        type="button"
+                        onClick={() => setIsForgotPassword(false)}
+                        className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium"
+                    >
+                        Back to Sign In
+                    </button>
+                </div>
+            </form>
+        );
+    }
+
     return (
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
             <div>
@@ -114,11 +183,22 @@ const AuthForm = () => {
                 />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+                    {isLogin && (
+                        <button
+                            type="button"
+                            onClick={() => setIsForgotPassword(true)}
+                            className="text-xs text-primary-600 hover:text-primary-700"
+                        >
+                            Forgot pwd?
+                        </button>
+                    )}
+                </div>
                 <input
                     type="password"
                     required
-                    minLength={6}
+                    minLength={8}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-4 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary-500"
@@ -139,7 +219,7 @@ const AuthForm = () => {
                             <input
                                 type="password"
                                 required={!isLogin}
-                                minLength={6}
+                                minLength={8}
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 className={`w-full px-4 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border ${password !== confirmPassword && confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary-500'} focus:ring-2`}
@@ -148,6 +228,9 @@ const AuthForm = () => {
                             {password !== confirmPassword && confirmPassword && (
                                 <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
                             )}
+                            <p className="text-xs text-gray-500 mt-2">
+                                Password must be at least 8 characters long, contain 1 uppercase letter and 1 number.
+                            </p>
                         </div>
                     </motion.div>
                 )}
@@ -174,8 +257,10 @@ const AuthForm = () => {
 };
 
 export default function PortfolioPage() {
-    const { user, signInWithGoogle, signOut, isLoading: authLoading } = useAuth();
-    const { settings } = useStore();
+    const { user, signInWithGoogle, signOut, isLoading: authLoading, session } = useAuth();
+    const router = useRouter();
+
+    const chatEndRef = useRef<HTMLDivElement>(null);
 
     const [items, setItems] = useState<PortfolioItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -183,6 +268,41 @@ export default function PortfolioPage() {
     const [totalGain, setTotalGain] = useState(0);
     const [newsAlerts, setNewsAlerts] = useState<PortfolioAlert[]>([]);
     const [loadingAlerts, setLoadingAlerts] = useState(false);
+
+    // Multi-Currency State
+    const [currency, setCurrency] = useState<'USD' | 'INR' | 'GBP' | 'EUR'>('USD');
+    const [fxRates, setFxRates] = useState<Record<string, number>>({ USD: 1, INR: 83.5, GBP: 0.79, EUR: 0.92 });
+
+    // Fetch live FX rates once on mount
+    useEffect(() => {
+        const fetchRates = async () => {
+            try {
+                const res = await axios.get('https://api.frankfurter.app/latest?from=USD&to=INR,GBP,EUR');
+                if (res.data && res.data.rates) {
+                    setFxRates({ USD: 1, ...res.data.rates });
+                }
+            } catch (e) {
+                console.warn('Failed to fetch live FX rates. Using fallbacks.');
+            }
+        };
+        fetchRates();
+    }, []);
+
+    const formatCurrency = useCallback((usdValue: number) => {
+        const rate = fxRates[currency] || 1;
+        const converted = usdValue * rate;
+
+        let prefix = '$';
+        if (currency === 'INR') prefix = '₹';
+        if (currency === 'GBP') prefix = '£';
+        if (currency === 'EUR') prefix = '€';
+
+        // For negative values, format securely (e.g. -₹100)
+        const isNegative = converted < 0;
+        const absVal = Math.abs(converted);
+
+        return `${isNegative ? '-' : ''}${prefix}${absVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }, [currency, fxRates]);
 
     const [isAdding, setIsAdding] = useState(false);
     const [showInstructions, setShowInstructions] = useState(false);
@@ -219,6 +339,11 @@ export default function PortfolioPage() {
     const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
     const [sendingChat, setSendingChat] = useState(false);
 
+    // Smart Deletion State
+    const [assetToDelete, setAssetToDelete] = useState<any | null>(null);
+    const [deletionAnalysis, setDeletionAnalysis] = useState<string | null>(null);
+    const [isAnalyzingDeletion, setIsAnalyzingDeletion] = useState(false);
+
     // FIX: Memoize services to prevent infinite re-render loop
     const marketService = React.useMemo(() =>
         new MarketDataService(),
@@ -230,8 +355,8 @@ export default function PortfolioPage() {
         const apiKey = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
         const model = AI_CONFIG.MODEL;
 
-        // Enforce plain text formatting
-        const formattingInstruction = " IMPORTANT: Provide your response in clean, plain text. Do NOT use markdown symbols like **bold**, ## headers, or - bullet points. Use standard paragraph formatting and numbering (1. 2. 3.) only if necessary.";
+        // Allow beautiful plain text and emojis, but no code blocks
+        const formattingInstruction = " IMPORTANT: Be engaging and highly conversational! Use spacing and **bold text** to highlight key metrics. Use relevant emojis. You MAY use code blocks and raw markdown lists if appropriate.";
         const finalSystemMsg = systemMsg + formattingInstruction;
 
         let retries = 2;
@@ -261,7 +386,7 @@ export default function PortfolioPage() {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
-        throw new Error('AI analysis failed. Please check your API key or connection.');
+        throw new Error('Our AI advisors are currently busy. Please try again in a few moments.');
     };
 
     const handleGetAIAdvice = async (stock: string, newsTitle: string, newsDesc: string) => {
@@ -282,7 +407,10 @@ export default function PortfolioPage() {
             const content = await callAI(prompt, 'Elite portfolio analyst. Focus on portfolio impact and capital preservation.');
             setSelectedAdvice({ title: stock, content: content });
         } catch (error) {
-            toast.error('Advisor busy. Check back soon.');
+            if (axios.isAxiosError(error)) {
+                console.error('Advisor error details:', error.response?.data || error.message);
+            }
+            toast.error('The Advisor is currently busy. Please try again shortly.');
         } finally {
             setLoadingAdvice(null);
         }
@@ -307,6 +435,93 @@ export default function PortfolioPage() {
             setAiInsight('Portfolio summary active. Check assets for live details.');
         } finally {
             setLoadingInsight(false);
+        }
+    };
+
+    useEffect(() => {
+        if (showChat && chatEndRef.current) {
+            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [chatMessages, showChat, sendingChat]);
+
+    const handleSendMessage = async () => {
+        if (!chatQuery.trim() || sendingChat) return;
+
+        const userMsg = chatQuery;
+        setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+        setChatQuery('');
+        setSendingChat(true);
+
+        // Prepare context
+        const pfContext = `Total Portfolio: $${items.reduce((acc, i) => acc + (i.value || 0), 0).toFixed(2)}\nAssets: ${items.map(i => `${i.symbol} (${i.quantity})`).join(', ')}`;
+        const userPersona = `Style: ${userProfile?.investment_type || 'long_term'}, Risk: ${userProfile?.risk_profile || 'moderate'}`;
+        const finalPrompt = `[CONTEXT]\n${pfContext}\n${userPersona}\n[USER QUERY]\n${userMsg}`;
+
+        // Create empty assistant message placeholder to stream into
+        setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: finalPrompt,
+                    marketMode: false,
+                    cryptoMode: false,
+                    sessionId: 'portfolio-chat',
+                    userId: user?.id,
+                    accessToken: session?.access_token,
+                    // Give recent memory context
+                    history: chatMessages.slice(-6).map(m => ({
+                        role: m.role,
+                        content: m.content
+                    }))
+                })
+            });
+
+            if (!res.ok) throw new Error('API Error');
+            if (!res.body) throw new Error('No stream body');
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedContent = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.text) {
+                                accumulatedContent += data.text;
+                                // Update the last message in state with the new chunk
+                                setChatMessages(prev => {
+                                    const newMsgs = [...prev];
+                                    newMsgs[newMsgs.length - 1] = { role: 'assistant', content: accumulatedContent };
+                                    return newMsgs;
+                                });
+                            }
+                        } catch (e) {
+                            // ignore parse errors for partial chunks
+                        }
+                    }
+                }
+            }
+
+        } catch (error) {
+            console.error('Chat error:', error);
+            setChatMessages(prev => {
+                const newMsgs = [...prev];
+                newMsgs[newMsgs.length - 1] = { role: 'assistant', content: "I'm sorry, I'm having trouble connecting right now." };
+                return newMsgs;
+            });
+        } finally {
+            setSendingChat(false);
         }
     };
 
@@ -511,11 +726,14 @@ export default function PortfolioPage() {
         if (!user) return;
 
         try {
+            const activeCurrencyRate = fxRates[currency] || 1;
+            const normalizedPrice = parseFloat(newItem.avg_price) / activeCurrencyRate;
+
             const { error } = await supabase.from('portfolio_items').insert({
                 user_id: user.id,
                 symbol: newItem.symbol.toUpperCase(),
                 quantity: parseFloat(newItem.quantity),
-                avg_price: parseFloat(newItem.avg_price),
+                avg_price: normalizedPrice,
                 asset_type: newItem.type,
                 buy_date: newItem.buy_date,
                 exchange: newItem.exchange
@@ -562,59 +780,45 @@ export default function PortfolioPage() {
         }
     }, []);
 
-    // AI Chat Handle
-    const handleSendMessage = async () => {
-        if (!chatQuery.trim() || sendingChat) return;
 
-        const q = chatQuery;
-        const userMsg = { role: 'user' as const, content: q };
-        setChatMessages(prev => [...prev, userMsg]);
-        setChatQuery('');
-        setSendingChat(true);
+    const initDeleteAsset = async (item: any) => {
+        setAssetToDelete(item);
+        setIsAnalyzingDeletion(true);
+        setDeletionAnalysis(null);
 
         try {
-            const apiKey = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
-            const totalVal = items.reduce((acc, i) => acc + (i.value || 0), 0);
-
-            // Build full portfolio context
-            const portfolioContext = items.map(i =>
-                `- ${i.symbol}: ${i.quantity} units, Value: $${i.value?.toFixed(0)}, return: ${i.gain_loss_percent?.toFixed(1)}%`
-            ).join('\n');
-
             const userPersona = `Style: ${userProfile?.investment_type || 'long_term'}, Risk: ${userProfile?.risk_profile || 'moderate'}`;
-
             const prompt = `
-            User Persona: ${userPersona}.
+            The user is about to sell/delete their entire position in ${item.symbol}.
+            Asset: ${item.symbol} (${item.asset_type})
+            Quantity: ${item.quantity}
+            Avg Buy Price: $${item.avg_price}
+            Current Price: $${item.current_price}
+            Total Return: ${item.gain_loss_percent?.toFixed(2)}%
             
-            Current Portfolio ($${totalVal.toFixed(0)} total):
-            ${portfolioContext}
+            Based on current market conditions and their persona (${userPersona}), provide a quick, punchy 3-bullet analysis:
+            1. Market Insight (Latest sentiment/trend)
+            2. Risk Summary (What happens if they sell now vs hold)
+            3. Final Recommendation (Sell, Hold, or Trim)
             
-            User Question: "${q}"
-            
-            Instructions:
-            1. Analyze the question in the context of the user's SPECIFIC holdings listed above.
-            2. If the user asks about an asset they own, refer to their specific position (quantity, profit/loss).
-            3. If they ask about a new asset, explain how it might fit into their current mix.
-            4. ${isSimpleEnglish ? 'Use simple, clear English.' : 'Use professional financial terminology.'}
+            Keep it under 100 words. ${isSimpleEnglish ? 'Simple English.' : 'Professional terminology.'}
             `;
-
-            const content = await callAI(prompt, 'You are an elite financial advisor who knows the user\'s portfolio intimately.');
-            setChatMessages(prev => [...prev, { role: 'assistant', content: content }]);
-
-        } catch (error) {
-            console.error('Chat Error:', error);
-            setChatMessages(prev => [...prev, { role: 'assistant', content: 'Connection lost. Please re-check your connection.' }]);
+            const analysis = await callAI(prompt, 'You are an elite financial risk manager.');
+            setDeletionAnalysis(analysis);
+        } catch (e) {
+            setDeletionAnalysis("Could not generate risk analysis at this time. Please proceed with caution.");
         } finally {
-            setSendingChat(false);
+            setIsAnalyzingDeletion(false);
         }
     };
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to remove this asset?')) return;
+
+    const confirmDelete = async () => {
+        if (!assetToDelete) return;
         try {
             const { error } = await supabase
                 .from('portfolio_items')
                 .delete()
-                .eq('id', id);
+                .eq('id', assetToDelete.id);
 
             if (error) throw error;
             toast.success('Asset removed');
@@ -622,6 +826,8 @@ export default function PortfolioPage() {
         } catch (error) {
             console.error(error);
             toast.error('Failed to delete asset');
+        } finally {
+            setAssetToDelete(null);
         }
     };
 
@@ -642,7 +848,7 @@ export default function PortfolioPage() {
                     </div>
                     <div>
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                            Sign in to Smart Portfolio
+                            Sign in to NewsLens AI
                         </h2>
                         <p className="text-gray-500 dark:text-gray-400">
                             Track your assets, analyze performance, and get AI insights for your portfolio.
@@ -652,9 +858,9 @@ export default function PortfolioPage() {
                     <div className="space-y-4">
                         <button
                             onClick={signInWithGoogle}
-                            className="w-full py-3 px-4 bg-white border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-center space-x-2 font-medium text-gray-700 dark:text-gray-200"
+                            className="w-full py-3 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-center space-x-2 font-medium text-gray-700 dark:text-gray-200"
                         >
-                            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+                            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 bg-white p-0.5 rounded-full" />
                             <span>Continue with Google</span>
                         </button>
 
@@ -675,7 +881,7 @@ export default function PortfolioPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 lg:p-10">
+        <div className="min-h-screen bg-transparent p-6 lg:p-10 pt-24 lg:pt-28">
             <div className="max-w-7xl mx-auto space-y-8">
 
                 {/* AI Thought Process Ticker */}
@@ -701,7 +907,7 @@ export default function PortfolioPage() {
                     <div>
                         <div className="flex items-center space-x-4 mb-2">
                             <a
-                                href="/"
+                                href="/dashboard"
                                 className="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center"
                             >
                                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -720,9 +926,19 @@ export default function PortfolioPage() {
                     </div>
 
                     <div className="flex items-center space-x-3">
+                        <select
+                            value={currency}
+                            onChange={(e) => setCurrency(e.target.value as any)}
+                            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-2 text-sm font-medium focus:ring-2 focus:ring-primary-500 cursor-pointer text-gray-700 dark:text-gray-300 shadow-sm"
+                        >
+                            <option value="USD">🇺🇸 USD</option>
+                            <option value="INR">🇮🇳 INR</option>
+                            <option value="EUR">🇪🇺 EUR</option>
+                            <option value="GBP">🇬🇧 GBP</option>
+                        </select>
                         <button
                             onClick={() => setShowInstructions(true)}
-                            className="p-2 text-gray-500 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition border border-gray-200 dark:border-gray-700 flex items-center"
+                            className="p-2 text-gray-500 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition border border-gray-200 dark:border-gray-700 flex items-center shadow-sm"
                             title="How it Works"
                         >
                             <AlertTriangle className="w-5 h-5 mr-1" />
@@ -844,8 +1060,10 @@ export default function PortfolioPage() {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-4 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
-                                        {selectedAdvice.content}
+                                    <div className="max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
+                                        <div className="space-y-4 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
+                                            {selectedAdvice.content}
+                                        </div>
                                     </div>
 
                                     <div className="pt-4 border-t dark:border-gray-700">
@@ -869,9 +1087,9 @@ export default function PortfolioPage() {
                         animate={{ opacity: 1, y: 0 }}
                         className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700"
                     >
-                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Balance</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Balance ({currency})</p>
                         <h3 className="text-4xl font-bold text-gray-900 dark:text-white mt-2">
-                            ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {formatCurrency(totalValue)}
                         </h3>
                         <p className="text-xs text-gray-400 mt-1">Based on real-time market data</p>
                     </motion.div>
@@ -884,10 +1102,10 @@ export default function PortfolioPage() {
                     >
                         <div className="flex justify-between items-start">
                             <div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Gain/Loss</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Gain/Loss ({currency})</p>
                                 <div className={`flex items-center mt-2 ${totalGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                                     <span className="text-2xl font-bold">
-                                        {totalGain >= 0 ? '+' : '-'}${Math.abs(totalGain).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {totalGain >= 0 ? '+' : ''}{formatCurrency(totalGain)}
                                     </span>
                                 </div>
                             </div>
@@ -1071,7 +1289,7 @@ export default function PortfolioPage() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Avg. Buy Price ($)</label>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Avg. Buy Price</label>
                                         <input
                                             type="number"
                                             required
@@ -1255,7 +1473,7 @@ export default function PortfolioPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right font-medium">
-                                                ${item.current_price?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                {formatCurrency(item.current_price || 0)}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className={`flex items-center justify-end ${item.daily_change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
@@ -1264,15 +1482,15 @@ export default function PortfolioPage() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <p className="text-gray-900 dark:text-white font-medium">{item.quantity}</p>
-                                                <p className="text-xs text-gray-500">Avg: ${item.avg_price}</p>
+                                                <p className="text-xs text-gray-500">Avg: {formatCurrency(item.avg_price)}</p>
                                             </td>
                                             <td className="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">
-                                                ${item.value?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                {formatCurrency(item.value || 0)}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className={`flex items-center justify-end ${(item.gain_loss || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                                                     {(item.gain_loss || 0) >= 0 ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
-                                                    <span className="font-medium">${Math.abs(item.gain_loss || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                    <span className="font-medium">{formatCurrency(Math.abs(item.gain_loss || 0)).replace('-', '')}</span>
                                                 </div>
                                                 <p className={`text-[10px] text-right font-bold ${(item.gain_loss_percent || 0) >= 0 ? 'text-green-600/70' : 'text-red-600/70'}`}>
                                                     {item.gain_loss_percent?.toFixed(1)}% total
@@ -1288,7 +1506,7 @@ export default function PortfolioPage() {
                                                         <BrainCircuit className="w-4 h-4" />
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDelete(item.id)}
+                                                        onClick={(e) => { e.stopPropagation(); initDeleteAsset(item); }}
                                                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/40 rounded-lg transition"
                                                         title="Remove Asset"
                                                     >
@@ -1304,6 +1522,62 @@ export default function PortfolioPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Smart Delete Modal */}
+            <AnimatePresence>
+                {assetToDelete && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100 dark:border-gray-800"
+                        >
+                            <div className="p-8">
+                                <div className="flex items-center space-x-3 text-red-500 mb-6">
+                                    <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-2xl">
+                                        <Trash2 className="w-8 h-8" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold">Remove {assetToDelete.symbol}?</h2>
+                                        <p className="text-sm text-gray-500 font-bold uppercase tracking-wider">Smart Deletion Analysis</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700 relative min-h-[120px]">
+                                        {isAnalyzingDeletion ? (
+                                            <div className="flex flex-col items-center justify-center space-y-4 py-4">
+                                                <RefreshCw className="w-8 h-8 animate-spin text-primary-500" />
+                                                <p className="text-sm font-bold text-gray-400 animate-pulse uppercase tracking-[0.2em]">Analyzing Market Risk...</p>
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium whitespace-pre-wrap italic">
+                                                "{deletionAnalysis || "Analysis engine is recalibrating. Standard sell caution advised."}"
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-col space-y-3">
+                                        <button
+                                            onClick={confirmDelete}
+                                            className="w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-500/20 text-lg flex items-center justify-center space-x-2"
+                                        >
+                                            <span>Confirm Final Removal</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setAssetToDelete(null)}
+                                            className="w-full py-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-2xl font-bold transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Asset Intelligence Drawer */}
             <AnimatePresence>
@@ -1466,7 +1740,7 @@ export default function PortfolioPage() {
 
                                 <div className="pt-8 border-t dark:border-gray-700">
                                     <button
-                                        onClick={() => handleDelete(selectedAsset.id)}
+                                        onClick={() => initDeleteAsset(selectedAsset)}
                                         className="w-full py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold transition flex items-center justify-center space-x-2"
                                     >
                                         <Trash2 className="w-5 h-5" />
@@ -1480,48 +1754,71 @@ export default function PortfolioPage() {
             </AnimatePresence>
 
             {/* Ask Portfolio AI FAB & Overlay */}
-            <div className="fixed bottom-8 right-8 z-[60]">
+            <div className="fixed bottom-8 right-8 z-[60] flex flex-col items-end">
                 <AnimatePresence>
                     {showChat && (
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            initial={{ opacity: 0, scale: 0.9, y: 20, transformOrigin: 'bottom right' }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-700 w-[400px] mb-4 overflow-hidden"
+                            className="bg-white/80 dark:bg-[#1A1D24]/90 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-white/20 dark:border-gray-800 w-[380px] sm:w-[420px] mb-4 overflow-hidden flex flex-col"
                         >
-                            <div className="bg-primary-600 p-4 text-white flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                    <BrainCircuit className="w-5 h-5" />
-                                    <span className="font-bold">Portfolio AI Commander</span>
+                            {/* Header - Sleek & Minimal */}
+                            <div className="p-6 pb-2 flex items-center justify-between border-b border-gray-100 dark:border-gray-800/50">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/20">
+                                        <BrainCircuit className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <h3 className="font-bold text-gray-900 dark:text-gray-100 leading-none mb-1">AI Commander</h3>
+                                        <span className="text-[10px] font-bold text-green-500 dark:text-green-400 uppercase tracking-widest flex items-center">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" />
+                                            Active Intelligence
+                                        </span>
+                                    </div>
                                 </div>
-                                <button onClick={() => setShowChat(false)}>
-                                    <X className="w-5 h-5" />
-                                </button>
                             </div>
-                            <div className="h-[400px] p-6 flex flex-col">
-                                <div className="flex-1 space-y-4 overflow-y-auto mb-4 scrollbar-hide text-sm font-medium">
+
+                            <div className="h-[450px] p-6 pt-4 flex flex-col">
+                                <div className="flex-1 space-y-6 overflow-y-auto mb-6 scrollbar-hide">
                                     {chatMessages.length === 0 && (
-                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-gray-800">
-                                            Greetings! I'm your Portfolio AI. How can I assist you with your {items.length} assets today?
+                                        <div className="bg-primary-50/50 dark:bg-primary-900/10 p-5 rounded-3xl text-gray-800 dark:text-gray-200 border border-primary-100/50 dark:border-primary-900/20 text-sm font-medium leading-relaxed">
+                                            <p className="mb-2">Hello! I'm your AI Portfolio Commander. 🫡</p>
+                                            <p className="opacity-70 text-xs">Ask me anything about your {items.length} assets, risk exposure, or market trends.</p>
                                         </div>
                                     )}
                                     {chatMessages.map((msg, idx) => (
-                                        <div key={idx} className={`p-4 rounded-2xl ${msg.role === 'user' ? 'bg-primary-50 dark:bg-primary-900/20 ml-8 text-right' : 'bg-gray-50 dark:bg-gray-900/50 mr-8'} border border-gray-100 dark:border-gray-800`}>
-                                            <p className="text-[10px] font-bold uppercase opacity-50 mb-1">{msg.role}</p>
-                                            <p className="text-gray-900 dark:text-white whitespace-pre-wrap">{msg.content}</p>
-                                        </div>
+                                        <motion.div
+                                            key={idx}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                        >
+                                            <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium shadow-sm transition-all ${msg.role === 'user'
+                                                ? 'bg-primary-600 text-white rounded-tr-sm'
+                                                : 'bg-gray-100 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700/50 rounded-tl-sm'
+                                                }`}>
+                                                <p className="whitespace-pre-wrap">{msg.content}</p>
+                                            </div>
+                                        </motion.div>
                                     ))}
                                     {sendingChat && (
-                                        <div className="flex justify-center py-2">
-                                            <RefreshCw className="w-5 h-5 animate-spin text-primary-500" />
+                                        <div className="flex justify-start">
+                                            <div className="bg-gray-100 dark:bg-gray-800/80 p-4 rounded-3xl border border-gray-200 dark:border-gray-700/50 flex items-center space-x-2">
+                                                <div className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                <div className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                <div className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                            </div>
                                         </div>
                                     )}
+                                    <div ref={chatEndRef} />
                                 </div>
-                                <div className="relative">
+
+                                <div className="relative group">
                                     <input
                                         type="text"
-                                        placeholder="Ask about risk, diversification..."
-                                        className="w-full bg-gray-100 dark:bg-gray-900 border-none rounded-2xl py-3 pl-4 pr-12 text-sm focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-white"
+                                        placeholder="Command AI..."
+                                        className="w-full bg-gray-100 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 rounded-2xl py-4 pl-5 pr-14 text-sm focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-white transition-all shadow-inner placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                         value={chatQuery}
                                         onChange={(e) => setChatQuery(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
@@ -1530,9 +1827,9 @@ export default function PortfolioPage() {
                                     <button
                                         onClick={handleSendMessage}
                                         disabled={sendingChat || !chatQuery.trim()}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-500/30 disabled:opacity-50"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-primary-600 hover:bg-primary-700 text-white rounded-xl shadow-lg shadow-primary-500/30 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center active:scale-90"
                                     >
-                                        <ArrowUpRight className="w-4 h-4" />
+                                        <ArrowUpRight className="w-5 h-5" />
                                     </button>
                                 </div>
                             </div>
@@ -1541,9 +1838,12 @@ export default function PortfolioPage() {
                 </AnimatePresence>
                 <button
                     onClick={() => setShowChat(!showChat)}
-                    className="w-16 h-16 bg-primary-600 rounded-full shadow-2xl shadow-primary-500/40 flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all"
+                    className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center text-white active:scale-95 ${showChat
+                        ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 rotate-90 scale-90'
+                        : 'bg-gradient-to-br from-primary-600 to-indigo-700 text-white hover:scale-110 shadow-primary-500/40'
+                        }`}
                 >
-                    {showChat ? <X className="w-8 h-8" /> : <BrainCircuit className="w-8 h-8" />}
+                    {showChat ? <X className="w-7 h-7" /> : <BrainCircuit className="w-7 h-7 sm:w-8 sm:h-8" />}
                 </button>
             </div>
         </div>

@@ -1,37 +1,58 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { MarketDataService } from '../../lib/apis';
 import { AI_CONFIG } from '../../lib/config';
+import { Redis } from '@upstash/redis';
+import { Ratelimit } from '@upstash/ratelimit';
+import { createClient } from '@supabase/supabase-js';
+import * as cheerio from 'cheerio';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 const marketService = new MarketDataService();
+
+// Initialize redis/ratelimit if env vars are present
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+let ratelimit: Ratelimit | null = null;
+
+if (redisUrl && redisToken) {
+    const redis = new Redis({
+        url: redisUrl,
+        token: redisToken,
+    });
+    ratelimit = new Ratelimit({
+        redis: redis,
+        limiter: Ratelimit.slidingWindow(10, '1 d'), // 10 requests per day per IP
+    });
+}
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { message, marketMode, cryptoMode, portfolio } = body;
+        const { message, marketMode, cryptoMode, portfolio, sessionId, userId, accessToken, history = [] } = body;
 
         // Vercel environment variables check
         const apiKey = process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
         const siteName = 'NewsLens AI';
 
-        console.log('--- CHAT API DEBUG ---');
-        console.log('API Route called successfully');
-        console.log('API Key configured:', !!apiKey);
-        console.log('Origin:', req.headers.get('origin'));
-        console.log('Model forced:', AI_CONFIG.MODEL);
-
         if (!apiKey) {
             console.error('CRITICAL: OpenRouter API Key is missing');
-            return NextResponse.json(
-                { error: 'OpenRouter API Key not configured on server' },
-                { status: 500 }
-            );
+            return new Response(JSON.stringify({ error: 'OpenRouter API Key not configured on server' }), { status: 500 });
         }
 
         if (!message) {
-            return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+            return new Response(JSON.stringify({ error: 'Message is required' }), { status: 400 });
+        }
+
+        // Rate limit check (Bypass if userId is present - logged in users have unlimited access)
+        if (ratelimit && !userId && (marketMode || cryptoMode)) {
+            const ip = req.ip ?? '127.0.0.1';
+            const { success } = await ratelimit.limit(ip);
+            if (!success) {
+                return new Response(JSON.stringify({ error: 'Daily limit exceeded for Advanced Modes. Please log in for unlimited access, or switch back to free General Chat.' }), { status: 429 });
+            }
         }
 
         let finalMessage = message;
@@ -40,9 +61,9 @@ export async function POST(req: NextRequest) {
         let detectedTicker = '';
 
         // --- SMART MODE & CRYPTO MODE LOGIC ---
-
-        const stockRegex = /\b[a-z]{2,5}\b|\$[a-z]{2,5}|\(([a-z]{2,5})\)/gi;
-        const cryptoKeywords = ['bitcoin', 'btc', 'ethereum', 'eth', 'solana', 'sol', 'doge', 'crypto', 'xrp', 'cardano'];
+        // Matches $AAPL or strictly 2+ uppercase letters (ignores generic lowercase words like 'price')
+        const stockRegex = /\$[a-zA-Z]{2,10}\b|\b[A-Z]{2,10}\b/g;
+        const cryptoKeywords = ['bitcoin', 'btc', 'ethereum', 'eth', 'solana', 'sol', 'dogecoin', 'doge', 'crypto', 'xrp', 'cardano', 'ada', 'binance', 'bnb', 'polkadot', 'dot', 'chainlink', 'link', 'polygon', 'matic'];
 
         const tickerMap: { [key: string]: string } = {
             'apple': 'AAPL',
@@ -57,7 +78,7 @@ export async function POST(req: NextRequest) {
         };
 
         let matches = message.match(stockRegex);
-        const isCryptoQuery = cryptoKeywords.some(k => message.toLowerCase().includes(k));
+        const isCryptoQuery = cryptoKeywords.some((k: string) => message.toLowerCase().includes(k));
 
         const namedTickers = Object.entries(tickerMap)
             .filter(([name]) => message.toLowerCase().includes(name))
@@ -66,7 +87,9 @@ export async function POST(req: NextRequest) {
         let uniqueTickers: string[] = [];
         if (matches || namedTickers.length > 0) {
             const rawMatches = (matches || []).map((m: string) => m.replace(/[()$]/g, '').toUpperCase());
-            uniqueTickers = Array.from(new Set([...rawMatches, ...namedTickers]));
+            // Filter out common stopwords that match 2-5 chars
+            const stopWords = ['HOW', 'WHY', 'WHAT', 'WHEN', 'WHO', 'THE', 'AND', 'FOR', 'ARE', 'YOU', 'CAN', 'OUT', 'DOING'];
+            uniqueTickers = Array.from(new Set([...rawMatches, ...namedTickers])).filter(t => !stopWords.includes(t));
         }
 
         if (marketMode || cryptoMode) {
@@ -76,11 +99,15 @@ export async function POST(req: NextRequest) {
             }
 
             if (cryptoMode && (uniqueTickers.length > 0 || isCryptoQuery)) {
-                const coin = message.toLowerCase().includes('btc') ? 'BTC' :
-                    message.toLowerCase().includes('eth') ? 'ETH' :
-                        message.toLowerCase().includes('sol') ? 'SOL' :
-                            message.toLowerCase().includes('doge') ? 'DOGE' :
-                                uniqueTickers[0] || 'BTC';
+                // Determine exact coin for the fetching logic.
+                const msgLower = message.toLowerCase();
+                const coin = msgLower.includes('btc') || msgLower.includes('bitcoin') ? 'BTC' :
+                    msgLower.includes('eth') || msgLower.includes('ethereum') ? 'ETH' :
+                        msgLower.includes('sol') || msgLower.includes('solana') ? 'SOL' :
+                            msgLower.includes('doge') ? 'DOGE' :
+                                msgLower.includes('xrp') ? 'XRP' :
+                                    msgLower.includes('ada') || msgLower.includes('cardano') ? 'ADA' :
+                                        uniqueTickers[0] || 'BTC';
 
                 try {
                     const quote = await marketService.getCryptoQuote(coin);
@@ -118,31 +145,65 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        let systemPrompt = `You are NewsLens AI, a helpful news assistant. ${portfolio && portfolio.length > 0 ? `The user holds these assets: [${portfolio.join(', ')}]. Prioritize news impacting these stocks.` : ''}`;
+        let scrapedText = '';
+        const urlMatch = message.match(/(https?:\/\/[^\s]+)/g);
+        if (urlMatch && urlMatch.length > 0) {
+            try {
+                const response = await fetch(urlMatch[0]);
+                const html = await response.text();
+                const $ = cheerio.load(html);
+
+                let pText = '';
+                $('p').each((i, el) => {
+                    pText += $(el).text() + ' ';
+                });
+
+                scrapedText = pText.substring(0, 4000); // Give AI up to 4k chars of body text
+            } catch (err) {
+                console.error("Cheerio scraping failed:", err);
+            }
+        }
+
+        let systemPrompt = `You are NewsLens AI, a friendly, highly intelligent assistant. 
+        CRITICAL FORMATTING RULES: 
+        1. STRONGLY ENCOURAGED: Use **bold** formatting for important entities, points, or headers. 
+        2. Keep paragraphs short and conversational. Do not use blocky unspaced text. Use nice spacing.
+        3. STRONGLY ENCOURAGED: Use relevant emojis to make the conversation lively and highly engaging!
+        4. Explain things in simple, jargon-free English.
+        ${portfolio && portfolio.length > 0 ? `The user holds these assets: [${portfolio.join(', ')}]. Prioritize news impacting these stocks.` : ''}`;
 
         if (cryptoMode) {
-            systemPrompt = `You are a "Crypto Degen" and Expert Analyst.
-             Style: Use crypto slang (HODL, moon, bearish divergence) but keep it professional enough for advice.
-             Focus: Price action, sentiment, and technicals.
+            systemPrompt = `You are a "Crypto Analyst".
+             Style: Friendly, conversational, use some crypto slang (HODL, bullish) but keep it professional enough for clear advice.
+             Focus: Price action, sentiment, and basic technicals in extremely simple terms.
              ${portfolio && portfolio.length > 0 ? `The user is tracking: [${portfolio.join(', ')}].` : ''}
              ${marketDataContext}
 
              CRITICAL INSTRUCTION:
-             - If Real-Time Data is provided above, USE IT. Cite the exact price.
-             - Do NOT output raw JSON or code snippets in your response. Focus on text analysis.`;
+             - If Real-Time Data is provided above, USE IT and cite the exact price.
+             - Make your output highly scannable using **bold**, emojis, and short paragraphs to make the UI look very high-end and premium.`;
         } else if (marketMode) {
-            systemPrompt = `You are a Professional Financial Analyst (Wall Street style).
-             Style: Professional, data-driven, concise.
-             Focus: Market impact, sector rotation, macroeconomics.
+            systemPrompt = `You are a Professional Financial Advisor aiming to educate a beginner.
+             Style: Friendly, data-driven but extremely simple to understand. Talk like a friendly human advisor.
+             Focus: Market impact, simple macroeconomics.
              ${portfolio && portfolio.length > 0 ? `The user is tracking: [${portfolio.join(', ')}].` : ''}
              ${marketDataContext}
 
              CRITICAL INSTRUCTION:
              - If Real-Time Data is provided above, USE IT.
-             - Do NOT output raw JSON or code snippets in your response. Focus on text analysis.`;
+             - Format text cleanly. Emphasize metrics with **bold text** and sprinkle in emojis for a conversational vibe.`;
         }
 
-        // Strictly using AI_CONFIG.MODEL to ensure it is ALWAYS stepfun/step-3.5-flash:free as requested
+        if (scrapedText) {
+            systemPrompt += `\n\n[LINK CONTENT EXTRACTION]: The user has provided a link. We ran an automated web scraper on it. Here is the article text extracted from the URL: \n"""\n${scrapedText}\n"""\n\nRead and base your analysis heavily on the text above when answering the user.`;
+        }
+
+        const messagesPayload = [
+            { role: 'system', content: systemPrompt },
+            ...history,
+            { role: 'user', content: finalMessage }
+        ];
+
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -153,66 +214,139 @@ export async function POST(req: NextRequest) {
             },
             body: JSON.stringify({
                 model: AI_CONFIG.MODEL,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: finalMessage }
-                ],
+                messages: messagesPayload,
                 temperature: 0.7,
                 max_tokens: 2000,
+                stream: true // Enable SSE streaming
             }),
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `OpenRouter responded with status ${response.status}`);
+        if (!response.ok || !response.body) {
+            const errorText = await response.text();
+            console.error('OpenRouter API Error:', errorText);
+
+            // Return a user-friendly generic error
+            return new Response(JSON.stringify({
+                error: "The AI service is currently busy or experiencing high traffic. Please try again in a few moments."
+            }), { status: 503 });
         }
 
-        const data = await response.json();
-        const aiContent = data.choices[0]?.message?.content || 'Failed to generate response.';
-
+        // --- MARKET ANALYSIS METADATA GENERATION ---
         let marketAnalysis = undefined;
-
         if (showAnalysis && (detectedTicker || uniqueTickers.length > 0)) {
-            const isBullish = aiContent.toLowerCase().includes('bullish') || aiContent.toLowerCase().includes('positive');
-            const isBearish = aiContent.toLowerCase().includes('bearish') || aiContent.toLowerCase().includes('negative');
-
+            // Since we stream, we can't definitively know the LLM's full sentiment yet.
+            // But we can do a preliminary best guess based on the data or default to natural.
             marketAnalysis = {
-                sentiment: isBullish ? 'bullish' : isBearish ? 'bearish' : 'neutral',
+                sentiment: 'neutral',
                 impactScore: 8,
-                confidence: 90,
+                confidence: 85,
                 symbol: uniqueTickers[0] || detectedTicker,
                 symbols: uniqueTickers.length > 0 ? uniqueTickers : [detectedTicker],
                 sectors: [{
                     name: cryptoMode ? 'Cryptocurrency' : 'Technology',
-                    impact: isBullish ? 'positive' : 'negative',
+                    impact: 'neutral',
                     score: 9,
-                    reasoning: 'Based on real-time price action.',
+                    reasoning: 'Live data analysis',
                     stocks: (uniqueTickers.length > 0 ? uniqueTickers : [detectedTicker]).map(t => ({
                         symbol: t,
                         name: t,
                         predictedChange: 0,
-                        reasoning: 'Real-time market data',
-                        confidence: 95
+                        reasoning: 'Real-time monitoring',
+                        confidence: 90
                     }))
                 }],
                 risks: [],
                 opportunities: [],
-                prediction: `Current trend analysis for ${uniqueTickers.join(', ')}.`
+                prediction: `Live tracking for ${uniqueTickers.join(', ')}.`
             };
         }
 
-        return NextResponse.json({
-            content: aiContent,
-            marketAnalysis: marketAnalysis
+        // --- STREAMING PIPELINE ---
+        let aiContent = "";
+
+        const stream = new ReadableStream({
+            async start(controller) {
+                const encoder = new TextEncoder();
+                const decoder = new TextDecoder();
+                const reader = response.body!.getReader();
+
+                // Send initial chunk with metadata
+                if (marketAnalysis) {
+                    controller.enqueue(encoder.encode(JSON.stringify({ type: 'metadata', data: marketAnalysis }) + '\n'));
+                }
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+                    for (const line of lines) {
+                        if (line === 'data: [DONE]') continue;
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const parseData = JSON.parse(line.slice(6));
+                                if (parseData.choices && parseData.choices[0].delta && parseData.choices[0].delta.content) {
+                                    const textChunk = parseData.choices[0].delta.content;
+                                    aiContent += textChunk;
+                                    controller.enqueue(encoder.encode(JSON.stringify({ type: 'content', text: textChunk }) + '\n'));
+                                }
+                            } catch (e) {
+                                // Mute parse errors for incomplete chunks
+                            }
+                        }
+                    }
+                }
+                controller.close();
+
+                // Save to Supabase DB if user is logged in
+                if (userId && sessionId && accessToken) {
+                    try {
+                        const supabaseAuthClient = createClient(
+                            process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+                            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+                            {
+                                global: { headers: { Authorization: `Bearer ${accessToken}` } }
+                            }
+                        );
+
+                        const mode = cryptoMode ? 'crypto' : marketMode ? 'market' : 'general';
+
+                        // Insert User Message
+                        await supabaseAuthClient.from('chat_history').insert({
+                            user_id: userId,
+                            session_id: sessionId,
+                            mode: mode,
+                            role: 'user',
+                            content: finalMessage
+                        });
+
+                        // Insert AI Message
+                        await supabaseAuthClient.from('chat_history').insert({
+                            user_id: userId,
+                            session_id: sessionId,
+                            mode: mode,
+                            role: 'assistant',
+                            content: aiContent
+                        });
+
+                    } catch (dbErr) {
+                        console.error('Failed to save to Supabase:', dbErr);
+                    }
+                }
+            }
+        });
+
+        return new Response(stream, {
+            headers: { 'Content-Type': 'text/event-stream' }
         });
 
     } catch (error: any) {
         console.error('--- API ROUTE ERROR ---');
         console.error('Message:', error.message);
-
-        return NextResponse.json(
-            { error: `Chat Error: ${error.message}` },
-            { status: 500 }
-        );
+        return new Response(JSON.stringify({
+            error: "I'm having trouble connecting to my brain right now. Please check your connection and try again."
+        }), { status: 500 });
     }
 }

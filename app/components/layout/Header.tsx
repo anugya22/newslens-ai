@@ -12,7 +12,8 @@ import {
   BarChart3,
   Wallet,
   Bitcoin,
-  MessageCircle
+  MessageCircle,
+  Clock
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button, GlassCard } from '../ui/Button';
@@ -35,7 +36,10 @@ const Header: React.FC = () => {
     cryptoMode,
     setCryptoMode,
     sidebarOpen,
-    setSidebarOpen
+    setSidebarOpen,
+    historySidebarOpen,
+    setHistorySidebarOpen,
+    clearMessages
   } = useStore();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -58,30 +62,45 @@ const Header: React.FC = () => {
       >
         <div className="flex items-center justify-between px-4 py-3">
           {/* Verified Clean: All merge conflicts resolved for Vercel deployment */}
-          {/* Logo and Title */}
-          <motion.div
-            className="flex items-center space-x-3"
-            whileHover={{ scale: 1.02 }}
-          >
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500">
-              <TrendingUp className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                NewsLens AI
-              </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Intelligent News Analysis
-              </p>
-            </div>
-          </motion.div>
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Menu className="w-5 h-5 text-gray-700 dark:text-gray-300" />}
+              onClick={() => setHistorySidebarOpen(!historySidebarOpen)}
+              className="mr-1"
+            />
+            {/* Logo and Title */}
+            <motion.div
+              className="flex items-center space-x-3"
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500">
+                <TrendingUp className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                  NewsLens AI
+                </h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Intelligent News Analysis
+                </p>
+              </div>
+            </motion.div>
+          </div>
 
           <div className="hidden md:flex items-center space-x-3">
             <Button
               variant={marketMode ? 'primary' : 'ghost'}
               size="sm"
               icon={<BarChart3 className="w-4 h-4" />}
-              onClick={() => setMarketMode(!marketMode)}
+              onClick={() => {
+                if (!marketMode) {
+                  clearMessages();
+                  setCryptoMode(false);
+                }
+                setMarketMode(!marketMode);
+              }}
               className={marketMode ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-600' : ''}
             >
               Market Mode
@@ -91,7 +110,13 @@ const Header: React.FC = () => {
               variant={cryptoMode ? 'primary' : 'ghost'}
               size="sm"
               icon={<Bitcoin className="w-4 h-4" />}
-              onClick={() => setCryptoMode(!cryptoMode)}
+              onClick={() => {
+                if (!cryptoMode) {
+                  clearMessages();
+                  setMarketMode(false);
+                }
+                setCryptoMode(!cryptoMode);
+              }}
               className={cryptoMode ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-600' : ''}
             >
               Crypto Advisory
@@ -104,14 +129,17 @@ const Header: React.FC = () => {
               size="sm"
               icon={<MessageSquare className="w-4 h-4" />}
               onClick={() => {
+                if (marketMode || cryptoMode) clearMessages();
                 setMarketMode(false);
                 setCryptoMode(false);
-                router.push('/');
+                router.push('/dashboard');
               }}
-              className={pathname === '/' && !marketMode && !cryptoMode ? 'text-primary-600 dark:text-primary-400 font-bold' : ''}
+              className={pathname === '/dashboard' && !marketMode && !cryptoMode ? 'text-primary-600 dark:text-primary-400 font-bold' : ''}
             >
               Chat
             </Button>
+
+
 
             <Button
               variant="ghost"
@@ -230,6 +258,15 @@ const Header: React.FC = () => {
               className="flex-1"
             >
               Chat
+            </Button>
+            <Button
+              variant={historySidebarOpen ? 'primary' : 'ghost'}
+              size="sm"
+              icon={<Clock className="w-4 h-4" />}
+              onClick={() => setHistorySidebarOpen(!historySidebarOpen)}
+              className="flex-1"
+            >
+              History
             </Button>
           </div>
         </div>

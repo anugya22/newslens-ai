@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import axios from 'axios';
 import { useStore } from '../lib/store';
+import { useAuth } from '../context/AuthContext';
 import { AI_CONFIG } from '../lib/config';
 import { ChatMessage, MarketAnalysis } from '../types';
 import toast from 'react-hot-toast';
@@ -14,12 +15,20 @@ export const useChatAPI = () => {
     settings,
     marketMode,
     cryptoMode,
-    news
+    news,
+    sessionId
   } = useStore();
+  const { user, session } = useAuth();
 
   const [isTyping, setIsTyping] = useState(false);
 
   const sendMessage = useCallback(async (content: string) => {
+    // Extract recent history BEFORE we add the new empty messages
+    const currentHistory = useStore.getState().messages.slice(-10).map(m => ({
+      role: m.type === 'user' ? 'user' : 'assistant',
+      content: m.content
+    }));
+
     // Add user message
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -32,42 +41,84 @@ export const useChatAPI = () => {
     setLoading(true);
     setIsTyping(true);
 
+    // Prepare an empty AI message to stream into
+    const aiMessageId = (Date.now() + 1).toString();
+    const initialAiMessage: ChatMessage = {
+      id: aiMessageId,
+      type: 'assistant',
+      content: '', // Start empty
+      timestamp: new Date().toISOString(),
+    };
+    addMessage(initialAiMessage);
+
     try {
-      // Call internal API route (keeps keys hidden)
-      const response = await axios.post('/api/chat', {
-        message: content,
-        model: AI_CONFIG.MODEL, // Always use StepFun
-        marketMode: marketMode,
-        cryptoMode: cryptoMode
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: content,
+          marketMode: marketMode,
+          cryptoMode: cryptoMode,
+          sessionId: sessionId,
+          userId: user?.id,
+          accessToken: session?.access_token,
+          history: currentHistory
+        })
       });
 
-      const { content: aiContent, marketAnalysis } = response.data;
+      if (!response.ok) {
+        let errMessage = 'Failed to get AI response';
+        try {
+          const errData = await response.json();
+          if (errData.error) errMessage = errData.error;
+        } catch {
+          errMessage = await response.text();
+        }
+        throw new Error(errMessage);
+      }
 
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: aiContent,
-        timestamp: new Date().toISOString(),
-        marketAnalysis: marketAnalysis as MarketAnalysis | undefined
-      };
+      if (!response.body) throw new Error('ReadableStream not yet supported in this browser.');
 
-      addMessage(aiMessage);
-    } catch (error) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+            if (data.type === 'metadata') {
+              useStore.getState().updateMessage(aiMessageId, { marketAnalysis: data.data });
+            } else if (data.type === 'content') {
+              accumulatedContent += data.text;
+              useStore.getState().updateMessage(aiMessageId, { content: accumulatedContent });
+            }
+          } catch (e) {
+            // Ignore parse errors on split chunks
+          }
+        }
+      }
+
+    } catch (error: any) {
       console.error('Chat Error:', error);
-      toast.error('Failed to get AI response. Please check your internet or API key.');
+      toast.error(error.message || 'The AI service is temporarily unavailable');
 
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: "I'm having trouble connecting to the AI right now. Please check your API settings.",
-        timestamp: new Date().toISOString(),
-      };
-      addMessage(errorMessage);
+      useStore.getState().updateMessage(aiMessageId, {
+        content: "I'm having trouble connecting to my brain right now. Please check your connection or try again in a few moments.",
+      });
     } finally {
       setLoading(false);
       setIsTyping(false);
     }
-  }, [settings.selectedModel, marketMode, cryptoMode, addMessage, setLoading]);
+  }, [marketMode, cryptoMode, addMessage, setLoading]);
 
   const parseLink = useCallback(async (message: string, url: string) => {
     if (!url) return;
@@ -82,37 +133,66 @@ export const useChatAPI = () => {
     };
     addMessage(userMsg);
 
-    try {
-      // Here we would ideally fetch the URL content content specifically
-      // For now, we'll ask the AI to "read" it (some models can browse, others allow passing URL context)
-      // Since we are using free models, we will simulate "reading" by passing the URL to the prompt
-      // and hoping the model has knowledge or we would need a separate scraping service.
-      // For a robust app, we'd use a server-side scraper.
+    const aiMessageId = (Date.now() + 1).toString();
+    const initialAiMessage: ChatMessage = {
+      id: aiMessageId,
+      type: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString(),
+    };
+    addMessage(initialAiMessage);
 
-      const response = await axios.post('/api/chat', {
-        message: `${message}\n\nPlease analyze this URL: ${url}`,
-        model: AI_CONFIG.MODEL, // Always use StepFun
-        marketMode: marketMode
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `${message}\n\nPlease analyze this URL: ${url}`,
+          marketMode: marketMode,
+          cryptoMode: cryptoMode,
+          sessionId: sessionId,
+          userId: user?.id,
+          accessToken: session?.access_token
+        })
       });
 
-      const analysis = response.data.content;
+      if (!response.ok) throw new Error('Failed to analyze URL');
+      if (!response.body) throw new Error('Streaming not supported');
 
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: analysis,
-        timestamp: new Date().toISOString(),
-      };
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
 
-      addMessage(aiMessage);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+            if (data.type === 'content') {
+              accumulatedContent += data.text;
+              useStore.getState().updateMessage(aiMessageId, { content: accumulatedContent });
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
 
     } catch (error) {
       console.error('URL Analysis Error:', error);
       toast.error('Failed to analyze URL');
+      useStore.getState().updateMessage(aiMessageId, {
+        content: "I'm having trouble analyzing this URL right now."
+      });
     } finally {
       setLoading(false);
     }
-  }, [settings.selectedModel, marketMode, cryptoMode, addMessage, setLoading]);
+  }, [marketMode, cryptoMode, addMessage, setLoading]);
 
 
 

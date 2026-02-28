@@ -76,31 +76,39 @@ export class PortfolioNewsService {
             score += 0.5;
         }
 
-        // Company name mapping (basic - can be expanded)
+        // Company name mapping (comprehensive)
         const companyNames: { [key: string]: string[] } = {
-            'AAPL': ['apple', 'iphone', 'ipad', 'mac'],
-            'GOOGL': ['google', 'alphabet', 'android'],
-            'MSFT': ['microsoft', 'windows', 'azure'],
-            'TSLA': ['tesla', 'elon musk', 'electric vehicle'],
-            'AMZN': ['amazon', 'aws', 'bezos'],
-            'NVDA': ['nvidia', 'gpu', 'ai chip'],
-            'META': ['meta', 'facebook', 'instagram', 'whatsapp'],
-            'NFLX': ['netflix', 'streaming'],
-            'BTC': ['bitcoin', 'btc'],
-            'ETH': ['ethereum', 'eth'],
+            'AAPL': ['apple', 'iphone', 'ipad', 'mac', 'ios', 'tim cook'],
+            'GOOGL': ['google', 'alphabet', 'android', 'gemini', 'sundar pichai'],
+            'MSFT': ['microsoft', 'windows', 'azure', 'satya nadella', 'openai'],
+            'TSLA': ['tesla', 'elon musk', 'electric vehicle', 'ev', 'model 3', 'cybertruck'],
+            'AMZN': ['amazon', 'aws', 'bezos', 'retail', 'e-commerce'],
+            'NVDA': ['nvidia', 'gpu', 'ai chip', 'h100', 'jensen huang'],
+            'META': ['meta', 'facebook', 'instagram', 'whatsapp', 'zuckerberg', 'quest'],
+            'NFLX': ['netflix', 'streaming', 'sqid game'],
+            'RELIANCE': ['reliance', 'ambani', 'jio', 'retail', 'petrochemical'],
+            'TCS': ['tcs', 'tata consultancy', 'tata group'],
+            'HDFCBANK': ['hdfc', 'hdfc bank'],
+            'INFY': ['infosys', 'narayana murthy'],
+            'ICICIBANK': ['icici', 'icici bank'],
+            'BTC': ['bitcoin', 'btc', 'digital gold', 'halving'],
+            'ETH': ['ethereum', 'eth', 'vitalik', 'staking', 'layer 2'],
+            'SOL': ['solana', 'sol', 'phantom'],
+            'DOGE': ['doge', 'dogecoin'],
         };
 
         const keywords = companyNames[symbol.toUpperCase()] || [];
         for (const keyword of keywords) {
             if (text.includes(keyword)) {
-                score += 0.3;
+                score += 0.4; // Boost from 0.3 to 0.4 to pass the 0.3 threshold immediately
                 break;
             }
         }
 
-        // Sector/industry keywords
-        if (text.includes('tech') || text.includes('technology')) score += 0.1;
-        if (text.includes('market') || text.includes('stock')) score += 0.1;
+        // Sector/industry keywords (helper boost)
+        if (text.includes('tech') || text.includes('technology')) score += 0.15;
+        if (text.includes('market') || text.includes('stock') || text.includes('exchange')) score += 0.15;
+        if (text.includes('crypto') || text.includes('blockchain')) score += 0.15;
 
         return Math.min(score, 1.0); // Cap at 1.0
     }

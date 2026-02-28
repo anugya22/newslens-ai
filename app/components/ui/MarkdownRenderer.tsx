@@ -64,14 +64,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
     };
 
     const parseInline = (text: string): React.ReactNode[] => {
-        // Split by bold (**text**)
-        // Improved regex to handle cases might be tricky, but basic ** should work.
-        // Let's rely on a simpler split that captures the delimiters.
-        const parts = text.split(/(\*\*.*?\*\*)/g);
+        // Handle bold (**text**) and italic (*text*)
+        const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
         return parts.map((part, i) => {
             if (part.startsWith('**') && part.endsWith('**')) {
-                // Remove asterisks and return strong
-                return <strong key={i} className="font-bold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>;
+                return <strong key={i} className="font-semibold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>;
+            }
+            if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+                return <em key={i} className="italic text-gray-800 dark:text-gray-200">{part.slice(1, -1)}</em>;
             }
             return <span key={i}>{part}</span>;
         });

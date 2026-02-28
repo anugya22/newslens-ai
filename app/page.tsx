@@ -1,212 +1,273 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { AnimatePresence } from 'framer-motion';
-import { Toaster } from 'react-hot-toast';
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, TrendingUp, LineChart, Shield, Zap, Globe, MessageSquare, Sun, Moon } from 'lucide-react';
 import { useStore } from './lib/store';
-import Header from './components/layout/Header';
-import ChatInterface from './components/chat/ChatInterface';
-import NewsSidebar from './components/news/NewsSidebar';
-import MarketAnalysis from './components/Analysis/MarketAnalysis';
+import { useAuth } from './context/AuthContext';
+import { useRouter } from 'next/navigation';
 
+export default function LandingPage() {
+    const { settings } = useStore();
+    const { user, isLoading: loading } = useAuth();
+    const router = useRouter();
+    const [scrolled, setScrolled] = useState(false);
 
-type MarketAnalysisType = React.ComponentProps<typeof MarketAnalysis>['analysis'];
+    useEffect(() => {
+        document.documentElement.classList.toggle('dark', settings.theme === 'dark');
 
-export default function Home() {
-  const {
-    settings,
-    marketMode,
-    cryptoMode,
-    sidebarOpen,
-    setSidebarOpen,
-    selectedArticle,
-    setSelectedArticle,
-    selectedAnalysis,
-    messages
-  } = useStore();
+        const handleScroll = () => {
+            setScrolled(window.scrollY > 20);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [settings.theme]);
 
-  // Header handles its own settings modal, so we don't need this state
-  // Market Analysis is now handled globally via selectedAnalysis in store
+    useEffect(() => {
+        // Automatically redirect logged-in users to the dashboard
+        if (user && !loading) {
+            router.push('/dashboard');
+        }
+    }, [user, loading, router]);
 
-  // Apply theme on mount
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', settings.theme === 'dark');
-  }, [settings.theme]);
-
-
-
-  // Get related topic from latest chat
-  const getRelatedTopic = () => {
-    const latestUserMessage = [...messages]
-      .reverse()
-      .find(msg => msg.type === 'user');
-
-    if (latestUserMessage) {
-      const content = latestUserMessage.content;
-
-      // 1. Look for explicit stock symbols/crypto (uppercase, 2-5 chars, maybe starting with $)
-      // Regex for potential tickers: \b[A-Z]{2,5}\b or \$[A-Za-z]{2,5}
-      const tickerMatch = content.match(/\b[A-Z]{2,5}\b/g) || content.match(/\$[A-Za-z]{2,5}/g);
-
-      if (tickerMatch && tickerMatch.length > 0) {
-        return tickerMatch[0].replace('$', '');
-      }
-
-      // 2. Fallback: Extract first meaningful keyword (simple split)
-      const words = content
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '') // Remove punctuation
-        .split(' ')
-        .filter(word => word.length > 3 && !['what', 'when', 'where', 'price', 'news', 'about', 'analysis'].includes(word));
-
-      if (words.length > 0) {
-        return words[0]; // User asked for "first word" relevance
-      }
+    if (loading) {
+        return <div className="min-h-screen bg-white dark:bg-[#212121]"></div>;
     }
 
-    // Default topics based on mode
-    if (cryptoMode) return 'cryptocurrency';
-    if (marketMode) return 'market';
-    return 'breaking news';
-  };
+    return (
+        <div className="min-h-screen text-slate-900 dark:text-white selection:bg-primary-500/30">
+            {/* Navigation */}
+            <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 py-3' : 'bg-transparent py-5'}`}>
+                <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                            <TrendingUp className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-xl font-black tracking-tight">NewsLens <span className="text-blue-600">AI</span></span>
+                    </div>
 
-  const [isLargeScreen, setIsLargeScreen] = useState(false);
+                    <div className="hidden md:flex flex-1 justify-center space-x-8 text-sm font-semibold text-gray-600 dark:text-gray-300">
+                        <a href="#features" className="hover:text-primary-600 dark:hover:text-primary-400 transition">Features</a>
+                        <a href="#markets" className="hover:text-primary-600 dark:hover:text-primary-400 transition">Markets</a>
+                        <a href="/portfolio" className="hover:text-primary-600 dark:hover:text-primary-400 transition">Portfolio</a>
+                    </div>
 
-  useEffect(() => {
-    const checkScreenSize = () => {
-      setIsLargeScreen(window.innerWidth >= 1024);
-    };
+                    <div className="flex items-center space-x-2 sm:space-x-4">
+                        <button
+                            onClick={() => useStore.getState().updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
+                            className="p-2 text-gray-600 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 transition rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                            aria-label="Toggle theme"
+                        >
+                            {settings.theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                        </button>
+                        {user ? (
+                            <Link href="/dashboard" className="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-full font-bold transition shadow-lg shadow-primary-500/25 flex items-center group">
+                                Go to App
+                                <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                            </Link>
+                        ) : (
+                            <>
+                                <Link href="/login" className="hidden sm:block text-sm font-bold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400 transition">
+                                    Sign In
+                                </Link>
+                                <Link href="/dashboard" className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-black rounded-full font-bold transition shadow-lg hover:scale-105 active:scale-95 flex items-center group">
+                                    Get Started
+                                </Link>
+                            </>
+                        )}
+                    </div>
+                </div>
+            </nav>
 
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
+            {/* Hero Section */}
+            <section className="relative pt-24 pb-20 lg:pt-32 lg:pb-32 overflow-hidden">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary-600/20 dark:bg-primary-500/10 blur-[120px] rounded-full pointer-events-none" />
 
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
+                <div className="relative max-w-7xl mx-auto px-6 text-center">
+                    <motion.div
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                        className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 font-bold text-sm mb-6 border border-primary-100 dark:border-primary-800/50"
+                    >
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-500"></span>
+                        </span>
+                        <span>NewsLens AI 2.0 is Live</span>
+                    </motion.div>
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900 transition-colors duration-300">
-      {/* Background Pattern */}
-      <div className="fixed inset-0 opacity-10">
-        <div className="absolute inset-0" />
-      </div>
+                    <motion.h1
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.1 }}
+                        className="text-5xl md:text-7xl font-black tracking-tight mb-8 leading-[1.1]"
+                    >
+                        Market Intelligence,<br />
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-indigo-500">
+                            Powered by AI.
+                        </span>
+                    </motion.h1>
 
-      {/* Header */}
-      <Header />
+                    <motion.p
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.2 }}
+                        className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed font-medium"
+                    >
+                        Chat with real-time global news, analyze stock trends, and manage your portfolio with an intelligent, autonomous financial agent.
+                    </motion.p>
 
-      {/* Main Content */}
-      <div className="pt-24 md:pt-28 h-screen flex relative z-0">
-        {/* Chat Interface */}
-        <div className="flex-1 flex flex-col">
-          <ChatInterface />
+                    <motion.div
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.3 }}
+                        className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4"
+                    >
+                        <Link
+                            href="/dashboard"
+                            className="w-full sm:w-auto px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white rounded-full font-bold text-lg transition-all shadow-[0_0_40px_rgba(79,70,229,0.4)] hover:shadow-[0_0_60px_rgba(79,70,229,0.6)] hover:-translate-y-1 flex items-center justify-center group"
+                        >
+                            <MessageSquare className="w-5 h-5 mr-2" />
+                            Start Chatting Free
+                            <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                        </Link>
+                    </motion.div>
+                </div>
+            </section>
+
+            {/* Features Grid */}
+            <section id="features" className="py-24 bg-white/40 dark:bg-black/20 backdrop-blur-md border-y border-gray-100 dark:border-gray-800/60 relative">
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="text-center max-w-3xl mx-auto mb-16">
+                        <h2 className="text-3xl md:text-5xl font-black mb-6">Everything you need to trade smarter.</h2>
+                        <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Say goodbye to dozens of confusing tabs. NewsLens AI merges news, charts, and analysis into one beautiful conversational interface.</p>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-8">
+                        <div className="bg-white/60 dark:bg-black/40 backdrop-blur-sm p-8 rounded-3xl border border-gray-100 dark:border-gray-800/50 hover:border-primary-500/50 transition-colors group shadow-xl">
+                            <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                <Globe className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <h3 className="text-xl font-bold mb-3">Global News Aggregation</h3>
+                            <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
+                                Curated RSS feeds scanning hundreds of trusted sources 24/7. Never miss a breaking headline.
+                            </p>
+                        </div>
+                        <div className="bg-white/60 dark:bg-black/40 backdrop-blur-sm p-8 rounded-3xl border border-gray-100 dark:border-gray-800/50 hover:border-primary-500/50 transition-colors group shadow-xl">
+                            <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                <LineChart className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
+                            </div>
+                            <h3 className="text-xl font-bold mb-3">Real-Time Market Data</h3>
+                            <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
+                                Live prices, charts, and intelligent ticker extraction for Stocks, ETFs, and Cryptocurrencies.
+                            </p>
+                        </div>
+                        <div className="bg-white/60 dark:bg-black/40 backdrop-blur-sm p-8 rounded-3xl border border-gray-100 dark:border-gray-800/50 hover:border-primary-500/50 transition-colors group shadow-xl">
+                            <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                <Shield className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <h3 className="text-xl font-bold mb-3">Smart Portfolio Tracking</h3>
+                            <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
+                                Track your assets with multi-currency support and receive automated AI alerts when news impacts your holdings.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* AI Showcase */}
+            <section className="py-24 overflow-hidden">
+                <div className="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center gap-16">
+                    <div className="flex-1 space-y-8">
+                        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold text-sm border border-indigo-100 dark:border-indigo-800/30">
+                            <Zap className="w-4 h-4" />
+                            <span>Powered by OpenRouter Edge</span>
+                        </div>
+                        <h2 className="text-4xl md:text-5xl font-black leading-tight">
+                            Like having a senior quantitative analyst by your side.
+                        </h2>
+                        <div className="space-y-6">
+                            <div className="flex items-start space-x-4">
+                                <div className="mt-1 w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 flex flex-shrink-0 items-center justify-center">
+                                    <span className="text-primary-600 font-bold">1</span>
+                                </div>
+                                <div>
+                                    <h4 className="text-lg font-bold">Paste a URL, get immediate analysis.</h4>
+                                    <p className="text-gray-600 dark:text-gray-400 font-medium mt-1">Our AI scrapes the article, extracts bias, key facts, and market impact automatically.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start space-x-4">
+                                <div className="mt-1 w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 flex flex-shrink-0 items-center justify-center">
+                                    <span className="text-primary-600 font-bold">2</span>
+                                </div>
+                                <div>
+                                    <h4 className="text-lg font-bold">Interactive data visualizations.</h4>
+                                    <p className="text-gray-600 dark:text-gray-400 font-medium mt-1">Ask "How is Apple doing?" and receive a beautiful real-time chart rendered right in the chat.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 w-full max-w-lg lg:max-w-none">
+                        {/* Mockup visual */}
+                        <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-200 dark:border-gray-800 bg-[#0F1115]">
+                            <div className="px-4 py-3 border-b border-gray-800 flex items-center space-x-2 bg-[#1A1D24]">
+                                <div className="w-3 h-3 rounded-full bg-red-500" />
+                                <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                                <div className="w-3 h-3 rounded-full bg-green-500" />
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div className="flex items-end justify-end">
+                                    <div className="max-w-[80%] bg-primary-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm font-medium">
+                                        Analyze the latest news on NVDA and tell me if I should trim my position.
+                                    </div>
+                                </div>
+                                <div className="flex items-start">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex-shrink-0 mr-3 flex items-center justify-center shadow-lg">
+                                        <TrendingUp className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div className="flex-1 max-w-[85%] bg-gray-100 dark:bg-[#1A1D24] border border-gray-200 dark:border-gray-800 text-gray-800 dark:text-gray-200 rounded-2xl rounded-tl-sm p-4 text-sm font-medium">
+                                        <div className="w-16 h-4 bg-gray-300 dark:bg-gray-700 rounded animate-pulse mb-3" />
+                                        <div className="space-y-2">
+                                            <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded" />
+                                            <div className="w-5/6 h-2 bg-gray-200 dark:bg-gray-800 rounded" />
+                                            <div className="w-4/6 h-2 bg-gray-200 dark:bg-gray-800 rounded" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* CTA Section */}
+            <section className="py-24 relative overflow-hidden">
+                <div className="absolute inset-0 bg-primary-600/5 dark:bg-primary-500/5 mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
+                <div className="max-w-4xl mx-auto px-6 text-center">
+                    <h2 className="text-4xl md:text-5xl font-black mb-8">Ready to upgrade your workflow?</h2>
+                    <Link
+                        href="/dashboard"
+                        className="px-10 py-5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black rounded-full font-bold text-xl transition-transform hover:scale-105 inline-flex items-center shadow-2xl"
+                    >
+                        Enter NewsLens AI
+                        <ArrowRight className="w-6 h-6 ml-3" />
+                    </Link>
+                </div>
+            </section>
+
+            <footer className="py-8 border-t border-gray-200 dark:border-gray-800 text-center text-sm font-bold text-gray-500">
+                <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center">
+                    <p>© 2026 NewsLens AI. All rights reserved.</p>
+                    <div className="space-x-4 mt-4 md:mt-0">
+                        <a href="#" className="hover:text-primary-500 transition">Privacy</a>
+                        <a href="#" className="hover:text-primary-500 transition">Terms</a>
+                        <a href="#" className="hover:text-primary-500 transition">Contact</a>
+                    </div>
+                </div>
+            </footer>
         </div>
-
-        {/* News Sidebar - SMALLER (25-30% on large screens) */}
-        <AnimatePresence>
-          {(sidebarOpen || isLargeScreen) && (
-            <div className={`
-              ${sidebarOpen ? 'fixed inset-y-0 right-0 z-40' : 'hidden lg:block'}
-              w-full max-w-sm lg:max-w-md xl:max-w-lg
-            `}>
-              <div className="h-full p-4">
-                <NewsSidebar relatedTopic={getRelatedTopic()} />
-              </div>
-
-              {/* Mobile Overlay */}
-              {sidebarOpen && (
-                <div
-                  className="fixed inset-0 bg-black/50 backdrop-blur-sm lg:hidden"
-                  onClick={() => setSidebarOpen(false)}
-                  style={{ zIndex: -1 }}
-                />
-              )}
-            </div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Market Analysis Modal */}
-      <AnimatePresence>
-        {selectedAnalysis && (
-          <MarketAnalysis
-            analysis={selectedAnalysis}
-            isVisible={!!selectedAnalysis}
-            onClose={() => useStore.getState().setSelectedAnalysis(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Floating button removed as per design - user accesses analysis via chat bubbles */}
-
-      {/* Article Detail Modal */}
-      <AnimatePresence>
-        {selectedArticle && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                    Article Details
-                  </h2>
-                  <button
-                    onClick={() => setSelectedArticle(null)}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                {selectedArticle.image && (
-                  <img
-                    src={selectedArticle.image}
-                    alt={selectedArticle.title}
-                    className="w-full h-64 object-cover rounded-lg mb-6"
-                  />
-                )}
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                  {selectedArticle.title}
-                </h1>
-                <p className="text-gray-700 dark:text-gray-300 mb-4">
-                  {selectedArticle.description}
-                </p>
-                <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                  <span>Source: {selectedArticle.source}</span>
-                  <span>{new Date(selectedArticle.publishedAt).toLocaleDateString()}</span>
-                </div>
-                <div className="mt-6">
-                  <a
-                    href={selectedArticle.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
-                  >
-                    Read Full Article
-                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Toast Notifications */}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: settings.theme === 'dark' ? '#374151' : '#ffffff',
-            color: settings.theme === 'dark' ? '#ffffff' : '#111827',
-            border: '1px solid',
-            borderColor: settings.theme === 'dark' ? '#4B5563' : '#E5E7EB',
-          },
-        }}
-      />
-    </div>
-  );
+    );
 }

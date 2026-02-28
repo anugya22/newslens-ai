@@ -10,6 +10,7 @@ interface AppStore {
   // Chat
   messages: ChatMessage[];
   addMessage: (message: ChatMessage) => void;
+  updateMessage: (id: string, partial: Partial<ChatMessage>) => void;
   clearMessages: () => void;
 
   // News
@@ -25,6 +26,7 @@ interface AppStore {
   // UI State
   isLoading: boolean;
   sidebarOpen: boolean;
+  historySidebarOpen: boolean;
   marketMode: boolean;
   cryptoMode: boolean;
   selectedArticle: NewsArticle | null;
@@ -33,19 +35,31 @@ interface AppStore {
 
   setLoading: (loading: boolean) => void;
   setSidebarOpen: (open: boolean) => void;
+  setHistorySidebarOpen: (open: boolean) => void;
   setMarketMode: (mode: boolean) => void;
   setCryptoMode: (mode: boolean) => void;
   setSelectedArticle: (article: NewsArticle | null) => void;
   setSelectedAnalysis: (analysis: any | null) => void;
   setPendingExplanation: (text: string | null) => void;
+
+  // Session
+  sessionId: string;
+  setSessionId: (id: string) => void;
 }
+
+const generateSessionId = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 export const useStore = create<AppStore>()(
   persist(
     (set, get) => ({
       // Initial settings
       settings: {
-        theme: 'dark',
+        theme: 'light',
         marketMode: false,
         autoRefresh: true,
         notifications: true,
@@ -61,7 +75,15 @@ export const useStore = create<AppStore>()(
       addMessage: (message) => set((state) => ({
         messages: [...state.messages, message],
       })),
-      clearMessages: () => set({ messages: [] }),
+      updateMessage: (id, partial) => set((state) => ({
+        messages: state.messages.map(msg =>
+          msg.id === id ? { ...msg, ...partial } : msg
+        ),
+      })),
+      clearMessages: () => set({
+        messages: [],
+        sessionId: generateSessionId() // Generate new session when cleared
+      }),
 
       // News state
       news: [],
@@ -76,14 +98,20 @@ export const useStore = create<AppStore>()(
       // UI state
       isLoading: false,
       sidebarOpen: false,
+      historySidebarOpen: false,
       marketMode: false,
       cryptoMode: false,
       selectedArticle: null,
       selectedAnalysis: null,
       pendingExplanation: null,
 
+      // Session
+      sessionId: generateSessionId(),
+      setSessionId: (id) => set({ sessionId: id, messages: [] }),
+
       setLoading: (loading) => set({ isLoading: loading }),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
+      setHistorySidebarOpen: (open) => set({ historySidebarOpen: open }),
       setMarketMode: (mode) => set({ marketMode: mode, cryptoMode: mode ? false : false }), // Disable cryptoMode if marketMode is enabled
       setCryptoMode: (mode) => set({ cryptoMode: mode, marketMode: mode ? false : false }), // Disable marketMode if cryptoMode is enabled
       setSelectedArticle: (article) => set({ selectedArticle: article }),

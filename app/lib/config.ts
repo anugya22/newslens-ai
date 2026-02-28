@@ -17,6 +17,9 @@ export const API_KEYS = {
   // CoinGecko is free and doesn't usually need a key for basic usage, 
   // but we can add an optional one if needed.
   COINGECKO: process.env.NEXT_PUBLIC_COINGECKO_API_KEY || '',
+
+  // Alpha Vantage for global/Indian stocks
+  ALPHAVANTAGE: process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY || '',
 };
 
 // AI Model Configuration

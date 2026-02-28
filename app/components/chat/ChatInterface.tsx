@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../../lib/store';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
-import { Loader2, MessageSquare } from 'lucide-react';
+import { Loader2, MessageSquare, Plus } from 'lucide-react';
 import { useChatAPI } from '../../hooks/useChat';
 
 const ChatInterface = () => {
@@ -35,7 +35,7 @@ const ChatInterface = () => {
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-full bg-transparent">
+    <div className="flex flex-col h-full bg-transparent min-h-0 relative">
       {/* Header - Simplified to avoid double header with main layout */}
       <div className="flex-shrink-0 p-4 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm lg:hidden">
         <div className="flex items-center justify-between">
@@ -60,10 +60,11 @@ const ChatInterface = () => {
           </span>
           <button
             onClick={() => useStore.getState().clearMessages()}
-            className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
-            title="Clear Chat History"
+            className="flex items-center space-x-1 px-3 py-1.5 bg-white dark:bg-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-primary-600 transition-all font-sans"
+            title="Start a new conversation"
           >
-            New Chat
+            <Plus className="w-4 h-4" />
+            <span>New Chat</span>
           </button>
         </div>
         {isLoading && (
@@ -84,14 +85,14 @@ const ChatInterface = () => {
               className="px-6 py-12 flex flex-col items-center justify-center max-w-4xl mx-auto text-center"
             >
               <motion.div
-                className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-primary-500 to-accent-600 flex items-center justify-center mb-8 shadow-2xl shadow-primary-500/20"
+                className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center mb-6 shadow-xl"
                 whileHover={{ rotate: 5, scale: 1.05 }}
               >
-                <MessageSquare className="w-10 h-10 text-white" />
+                <MessageSquare className="w-8 h-8 text-gray-500 dark:text-gray-400" />
               </motion.div>
 
-              <h3 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6 tracking-tight">
-                Analyze the news with <span className="bg-gradient-to-r from-primary-600 to-accent-600 dark:from-primary-400 dark:to-accent-500 bg-clip-text text-transparent">Intelligence</span>
+              <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 tracking-tight">
+                How can I help you today?
               </h3>
 
               <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mb-12 leading-relaxed">
@@ -116,7 +117,7 @@ const ChatInterface = () => {
                     key={index}
                     className="group relative p-4 text-left bg-white/50 dark:bg-gray-800/50 rounded-2xl border border-gray-200/50 dark:border-white/10 hover:bg-white dark:hover:bg-gray-800 transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/5"
                     onClick={() => {
-                      // Insert query logic can be added here
+                      setPendingExplanation(item.text);
                     }}
                   >
                     <div className="flex items-center space-x-4">
