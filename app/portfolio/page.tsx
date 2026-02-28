@@ -1764,10 +1764,10 @@ export default function PortfolioPage() {
                             initial={{ opacity: 0, scale: 0.9, y: 20, transformOrigin: 'bottom right' }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="bg-white/80 dark:bg-[#1A1D24]/90 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-white/20 dark:border-gray-800 w-[380px] sm:w-[420px] mb-4 overflow-hidden flex flex-col"
+                            className="bg-white/80 dark:bg-[#1A1D24]/90 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-white/20 dark:border-gray-800 w-[380px] sm:w-[420px] mb-4 overflow-hidden flex flex-col max-h-[calc(100vh-140px)]"
                         >
                             {/* Header - Sleek & Minimal */}
-                            <div className="p-6 pb-2 flex items-center justify-between border-b border-gray-100 dark:border-gray-800/50">
+                            <div className="p-5 pb-2 flex items-center justify-between border-b border-gray-100 dark:border-gray-800/50 flex-shrink-0">
                                 <div className="flex items-center space-x-3">
                                     <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/20">
                                         <BrainCircuit className="w-5 h-5 text-white" />
@@ -1782,7 +1782,7 @@ export default function PortfolioPage() {
                                 </div>
                             </div>
 
-                            <div className="h-[450px] p-6 pt-4 flex flex-col">
+                            <div className="flex-1 p-5 pt-4 flex flex-col overflow-hidden min-h-[300px]">
                                 <div className="flex-1 space-y-6 overflow-y-auto mb-6 scrollbar-hide">
                                     {chatMessages.length === 0 && (
                                         <div className="bg-primary-50/50 dark:bg-primary-900/10 p-5 rounded-3xl text-gray-800 dark:text-gray-200 border border-primary-100/50 dark:border-primary-900/20 text-sm font-medium leading-relaxed">
@@ -1841,12 +1841,12 @@ export default function PortfolioPage() {
                 </AnimatePresence>
                 <button
                     onClick={() => setShowChat(!showChat)}
-                    className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center text-white active:scale-95 ${showChat
+                    className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center text-white active:scale-95 ${showChat
                         ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 rotate-90 scale-90'
                         : 'bg-gradient-to-br from-primary-600 to-indigo-700 text-white hover:scale-110 shadow-primary-500/40'
                         }`}
                 >
-                    {showChat ? <X className="w-7 h-7" /> : <BrainCircuit className="w-7 h-7 sm:w-8 sm:h-8" />}
+                    {showChat ? <X className="w-6 h-6" /> : <BrainCircuit className="w-6 h-6 sm:w-7 sm:h-7" />}
                 </button>
             </div>
         </div>

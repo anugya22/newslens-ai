@@ -162,7 +162,8 @@ export class NewsService {
     }
 
     try {
-      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-US&gl=US&ceid=US:en`;
+      // Force recent news (last 7 days max) to avoid stale "9d ago" results
+      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}+when:7d&hl=en-US&gl=US&ceid=US:en`;
       const proxyUrl = `/api/rss?url=${encodeURIComponent(rssUrl)}`;
       const response = await axios.get(proxyUrl);
       const xmlData = response.data.contents || response.data;
@@ -217,8 +218,12 @@ export class NewsService {
     let text = html.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
     // 2. Remove script/style tags
     text = text.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
-    // 3. Remove all other HTML tags
-    text = text.replace(/<[^>]*>?/gm, '');
+
+    // Google News specific: The description often contains 'href="..." target="_blank">Text</a>'.
+    // We want the text, not the tags.
+    // 3. Very aggressively remove ANY HTML tags, accounting for newlines within tags
+    text = text.replace(/<[^>]+>/g, '');
+
     // 4. Unescape common entities
     text = text
       .replace(/&amp;/g, '&')
