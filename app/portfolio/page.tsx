@@ -354,41 +354,20 @@ export default function PortfolioPage() {
 
     // AI Helper: Robust call with enforced plain text
     const callAI = async (prompt: string, systemMsg: string = 'You are a professional financial assistant.') => {
-        const apiKey = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
-        const model = 'meta-llama/llama-3.3-70b-instruct:free';
+        try {
+            const res = await axios.post('/api/portfolio/insight', {
+                prompt,
+                systemMsg
+            });
 
-        // Allow beautiful plain text and emojis, but no code blocks
-        const formattingInstruction = " IMPORTANT: Be engaging and highly conversational! Use spacing and **bold text** to highlight key metrics. Use relevant emojis. You MAY use code blocks and raw markdown lists if appropriate.";
-        const finalSystemMsg = systemMsg + formattingInstruction;
-
-        let retries = 2;
-        while (retries >= 0) {
-            try {
-                const res = await axios.post(
-                    'https://openrouter.ai/api/v1/chat/completions',
-                    {
-                        model: model,
-                        messages: [
-                            { role: 'system', content: finalSystemMsg },
-                            { role: 'user', content: prompt }
-                        ]
-                    },
-                    {
-                        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                        timeout: 20000
-                    }
-                );
-                if (res.data?.choices?.[0]?.message?.content) {
-                    return res.data.choices[0].message.content;
-                }
-            } catch (e: any) {
-                console.warn(`Model ${model} failed:`, e.message);
-                if (retries === 0) break;
-                retries--;
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            if (res.data?.content) {
+                return res.data.content;
             }
+            throw new Error('Empty response');
+        } catch (e: any) {
+            console.error('Portfolio AI Error:', e.message);
+            throw new Error('Our AI advisors are currently busy. Please try again in a few moments.');
         }
-        throw new Error('Our AI advisors are currently busy. Please try again in a few moments.');
     };
 
     const handleGetAIAdvice = async (stock: string, newsTitle: string, newsDesc: string) => {

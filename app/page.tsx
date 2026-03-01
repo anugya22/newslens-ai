@@ -25,12 +25,19 @@ export default function LandingPage() {
     }, [settings.theme]);
 
     useEffect(() => {
-        // If they just logged in or hit the root URL natively, redirect them 
-        // But if they clicked the 'Home' button from the dashboard, this won't force them back instantly
-        if (user && !loading && typeof window !== 'undefined' && !document.referrer.includes('/dashboard')) {
-            window.location.href = '/dashboard';
+        // Only redirect if:
+        // 1. User is logged in
+        // 2. Auth is not loading
+        // 3. We are NOT specifically navigating back to Home (check if referrer is the same site but a different path)
+        const isInternalNavigation = document.referrer &&
+            document.referrer.includes(window.location.host) &&
+            !document.referrer.endsWith('/') &&
+            !document.referrer.includes('/login');
+
+        if (user && !loading && !isInternalNavigation) {
+            router.push('/dashboard');
         }
-    }, [user, loading]);
+    }, [user, loading, router]);
 
     if (loading) {
         return <div className="min-h-screen bg-white dark:bg-[#0B0C10]"></div>;
