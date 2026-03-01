@@ -126,7 +126,11 @@ export const useStore = create<AppStore>()(
       name: 'newslens-storage',
       partialize: (state) => ({
         settings: state.settings,
-        // messages: state.messages, // Commented out to prevent persistence of chat history
+        messages: state.messages,
+        news: state.news,
+        sessionId: state.sessionId,
+        marketMode: state.marketMode,
+        cryptoMode: state.cryptoMode,
       }),
     }
   )

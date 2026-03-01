@@ -9,6 +9,7 @@ import ChatInterface from '../components/chat/ChatInterface';
 import NewsSidebar from '../components/news/NewsSidebar';
 import MarketAnalysis from '../components/Analysis/MarketAnalysis';
 import HistorySidebar from '../components/layout/HistorySidebar';
+import { HistoryHydrator } from '../components/chat/HistoryHydrator';
 
 
 type MarketAnalysisType = React.ComponentProps<typeof MarketAnalysis>['analysis'];
@@ -107,6 +108,9 @@ export default function Home() {
 
       {/* Header */}
       <Header />
+
+      {/* History Hydrator (Sync from Supabase if needed) */}
+      <HistoryHydrator />
 
       {/* History Sidebar - Full Height Edge */}
       <HistorySidebar />
