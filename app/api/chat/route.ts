@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { MarketDataService, EconomicDataService } from '../../lib/apis';
+import { MarketDataService, EconomicDataService, NewsService } from '../../lib/apis';
 import { AI_CONFIG } from '../../lib/config';
 import { Redis } from '@upstash/redis';
 import { Ratelimit } from '@upstash/ratelimit';
@@ -266,6 +266,35 @@ export async function POST(req: NextRequest) {
             console.error('FRED Fetch Error:', err);
         }
 
+        // --- NEWS DATA FETCHING ---
+        const newsService = new NewsService();
+        let newsContext = 'No recent news articles retrieved for this topic.';
+
+        // Detect if the user is asking about news or general topics
+        const newsKeywords = ['news', 'latest', 'updates', 'politics', 'headlines', 'what happened', 'breaking'];
+        const isNewsQuery = newsKeywords.some(k => message.toLowerCase().includes(k));
+
+        if (isNewsQuery || marketMode || cryptoMode) {
+            try {
+                // Determine topic: Use detected ticker OR keywords
+                let newsTopic = detectedTicker || 'breaking news';
+                if (message.toLowerCase().includes('india')) newsTopic = 'india';
+                if (message.toLowerCase().includes('crypto')) newsTopic = 'crypto';
+                if (message.toLowerCase().includes('politics')) {
+                    newsTopic = message.toLowerCase().includes('india') ? 'india politics' : 'politics';
+                }
+
+                const articles = await newsService.getNewsByTopic(newsTopic);
+                if (articles && articles.length > 0) {
+                    newsContext = articles.slice(0, 5).map(a =>
+                        `[${a.source}] ${a.title}: ${a.description} (${a.url})`
+                    ).join('\n\n');
+                }
+            } catch (err) {
+                console.error('News Fetch Error:', err);
+            }
+        }
+
         // --- LAYERED PROMPT ARCHITECTURE ---
         const today = new Date().toLocaleDateString('en-US', {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -312,8 +341,11 @@ export async function POST(req: NextRequest) {
                 [REAL-TIME MARKET DATA]:
                 ${marketDataContext || 'No market data retrieved from APIs.'}
                 
-                [NEWS/LINK CONTENT]:
-                ${scrapedText ? `\n${scrapedText}` : 'No recent scraped content available.'}
+                [RECENT NEWS CONTEXT]:
+                ${newsContext}
+                
+                [SCRAPED CONTENT/LINKS]:
+                ${scrapedText ? `\n${scrapedText}` : 'No direct scraped content available.'}
                 
                 [USER PORTFOLIO]:
                 ${portfolio && portfolio.length > 0 ? `[${portfolio.join(', ')}]` : 'No portfolio linked.'}`

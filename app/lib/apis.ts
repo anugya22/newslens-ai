@@ -163,9 +163,10 @@ export class NewsService {
 
     try {
       // Force recent news (last 7 days max) to avoid stale "9d ago" results
+      const isServer = typeof window === 'undefined';
       const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}+when:7d&hl=en-US&gl=US&ceid=US:en`;
-      const proxyUrl = `/api/rss?url=${encodeURIComponent(rssUrl)}`;
-      const response = await axios.get(proxyUrl);
+      const finalUrl = isServer ? rssUrl : `/api/rss?url=${encodeURIComponent(rssUrl)}`;
+      const response = await axios.get(finalUrl);
       const xmlData = response.data.contents || response.data;
 
       const itemsMatch = typeof xmlData === 'string' ? xmlData.match(/<item>([\s\S]*?)<\/item>/g) : null;

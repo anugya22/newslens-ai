@@ -27,7 +27,13 @@ const FEEDS: RSSFeed[] = [
 ];
 
 export class RSSService {
+    private isServer = typeof window === 'undefined';
     private CORS_PROXY = '/api/rss?url=';
+
+    private getFetchUrl(url: string): string {
+        if (this.isServer) return url; // Fetch directly on server
+        return `${this.CORS_PROXY}${encodeURIComponent(url)}`;
+    }
 
     async getAllNews(): Promise<NewsArticle[]> {
         // Determine which feeds to fetch based on a strategy
@@ -78,11 +84,9 @@ export class RSSService {
 
     private async fetchFeed(feed: RSSFeed): Promise<NewsArticle[]> {
         try {
-            const response = await axios.get(`${this.CORS_PROXY}${encodeURIComponent(feed.url)}`);
-            if (!response.data || !response.data.contents) {
-                throw new Error('Invalid response from proxy');
-            }
-
+            const fetchUrl = this.getFetchUrl(feed.url);
+            const response = await axios.get(fetchUrl);
+            // Some feeds return data directly, some wrap in 'contents' from our proxy
             const xmlData = response.data.contents || response.data;
             const itemsMatch = typeof xmlData === 'string' ? xmlData.match(/<item>([\s\S]*?)<\/item>/g) : null;
 
