@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
 
-export const SessionManager = () => {
+const SessionManager = () => {
     const { user, isLoading: authLoading } = useAuth();
     const { messages, setSessionId, clearMessages } = useStore();
     const initRef = useRef(false);
@@ -57,3 +57,5 @@ export const SessionManager = () => {
 
     return null; // Invisible strictly-logical component
 };
+
+export default SessionManager;

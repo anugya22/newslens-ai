@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from './context/AuthContext';
 import { AssetNewsProvider } from './components/AssetNewsProvider';
-import { SessionManager } from './components/layout/SessionManager';
+import SessionManager from './components/layout/SessionManager';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
