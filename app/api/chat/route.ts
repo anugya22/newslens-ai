@@ -49,9 +49,14 @@ export async function POST(req: NextRequest) {
         // Rate limit check (Bypass if userId is present - logged in users have unlimited access)
         if (ratelimit && !userId && (marketMode || cryptoMode)) {
             const ip = req.ip ?? '127.0.0.1';
-            const { success } = await ratelimit.limit(ip);
+            const modeKey = cryptoMode ? 'crypto' : 'market';
+            const { success, remaining } = await ratelimit.limit(`limit_${modeKey}_${ip}`);
+
             if (!success) {
-                return new Response(JSON.stringify({ error: 'Daily limit exceeded for Advanced Modes. Please log in for unlimited access, or switch back to free General Chat.' }), { status: 429 });
+                return new Response(JSON.stringify({
+                    error: `You've reached your daily limit for ${cryptoMode ? 'Crypto Advisory' : 'Market Analysis'} mode. Please sign in for unlimited access!`,
+                    limitExceeded: true
+                }), { status: 429 });
             }
         }
 

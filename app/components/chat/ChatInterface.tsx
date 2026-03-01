@@ -27,19 +27,19 @@ const ChatInterface = () => {
     const container = messagesEndRef.current.parentElement;
     if (!container) return;
 
-    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    // Increase threshold to 150px to account for fast-streaming chunks
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
 
-    if (force || isNearBottom) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (force || isNearBottom || isLoading) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto' }); // 'auto' prevents jittering during rapid token streaming
     }
   };
 
   useEffect(() => {
-    // Only force scroll if the last message is from the user
-    // Otherwise, only scroll if they were already at the bottom
+    // Force scroll if the user just sent a message or if the AI is actively streaming
     const lastMessage = messages[messages.length - 1];
-    scrollToBottom(lastMessage?.type === 'user');
-  }, [messages]);
+    scrollToBottom(lastMessage?.type === 'user' || isLoading);
+  }, [messages, isLoading]);
 
   if (!hasHydrated) return null;
 

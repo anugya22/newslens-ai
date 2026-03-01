@@ -442,7 +442,7 @@ export default function PortfolioPage() {
 
     useEffect(() => {
         if (showChat && chatEndRef.current) {
-            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+            chatEndRef.current.scrollIntoView({ behavior: 'auto' });
         }
     }, [chatMessages, showChat, sendingChat]);
 

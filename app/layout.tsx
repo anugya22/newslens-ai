@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from './context/AuthContext';
 import { AssetNewsProvider } from './components/AssetNewsProvider';
+import { SessionManager } from './components/layout/SessionManager';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
@@ -45,6 +46,7 @@ export default function RootLayout({
           <div className="absolute top-[20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-400/10 dark:bg-purple-600/10 blur-[120px] mix-blend-multiply dark:mix-blend-screen" />
           <div className="absolute bottom-[-10%] left-[20%] w-[60%] h-[60%] rounded-full bg-blue-300/10 dark:bg-blue-800/10 blur-[120px] mix-blend-multiply dark:mix-blend-screen" />
         </div>
+        <SessionManager />
         <AuthProvider>
           <AssetNewsProvider>
             {children}
