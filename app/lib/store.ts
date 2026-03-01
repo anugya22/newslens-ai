@@ -11,6 +11,7 @@ interface AppStore {
   messages: ChatMessage[];
   addMessage: (message: ChatMessage) => void;
   updateMessage: (id: string, partial: Partial<ChatMessage>) => void;
+  removeMessage: (id: string) => void;
   clearMessages: () => void;
 
   // News
@@ -82,6 +83,9 @@ export const useStore = create<AppStore>()(
           msg.id === id ? { ...msg, ...partial } : msg
         ),
       })),
+      removeMessage: (id) => set((state) => ({
+        messages: state.messages.filter(msg => msg.id !== id),
+      })),
       clearMessages: () => set({
         messages: [],
         sessionId: generateSessionId() // Generate new session when cleared
@@ -142,11 +146,11 @@ export const useStore = create<AppStore>()(
       name: 'newslens-storage',
       partialize: (state) => ({
         settings: state.settings,
-        messages: state.messages,
         news: state.news,
-        sessionId: state.sessionId,
         marketMode: state.marketMode,
         cryptoMode: state.cryptoMode,
+        sessionId: state.sessionId,
+        messages: state.messages,
       }),
     }
   )

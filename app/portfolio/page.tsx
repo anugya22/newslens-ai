@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { useAssetNews } from '../components/AssetNewsProvider';
 import { supabase } from '../lib/supabase';
 import { PortfolioNewsService } from '../lib/portfolioNews';
 import {
@@ -267,8 +268,9 @@ export default function PortfolioPage() {
     const [loading, setLoading] = useState(true);
     const [totalValue, setTotalValue] = useState(0);
     const [totalGain, setTotalGain] = useState(0);
-    const [newsAlerts, setNewsAlerts] = useState<PortfolioAlert[]>([]);
-    const [loadingAlerts, setLoadingAlerts] = useState(false);
+
+    // Replace local news state with Global Asset News Context
+    const { newsFeed: newsAlerts, isLoading: loadingAlerts, refreshNews: fetchNewsAlerts } = useAssetNews();
 
     // Multi-Currency State
     const [currency, setCurrency] = useState<'USD' | 'INR' | 'GBP' | 'EUR'>('USD');
@@ -349,7 +351,6 @@ export default function PortfolioPage() {
     const marketService = React.useMemo(() =>
         new MarketDataService(),
         []);
-    const newsService = React.useMemo(() => new PortfolioNewsService(), []);
 
     // AI Helper: Robust call with enforced plain text
     const callAI = async (prompt: string, systemMsg: string = 'You are a professional financial assistant.') => {
@@ -565,90 +566,6 @@ export default function PortfolioPage() {
         return Math.round(health);
     };
 
-    // RESTORED: Fetch News Alerts
-    const fetchNewsAlerts = useCallback(async (symbols: string[], currentItems: PortfolioItem[]) => {
-        if (!symbols.length) return;
-        setLoadingAlerts(true);
-        setIsScanning(true);
-        setAiStatus(`Scanning news for ${symbols.join(', ')}...`);
-        try {
-            setAiStatus(`Scanning news for ${symbols.join(', ')}...`);
-            const fetchedAlerts = await newsService.getNewsForSymbols(symbols);
-
-            // --- News Persistence & Deduplication Logic ---
-            const TWO_DAYS_MS = 48 * 60 * 60 * 1000;
-            const now = Date.now();
-
-            // 1. Load existing cache
-            const cachedNewsJson = typeof window !== 'undefined' ? localStorage.getItem('portfolio_news_cache') : null;
-            let cachedNews: PortfolioAlert[] = cachedNewsJson ? JSON.parse(cachedNewsJson) : [];
-
-            // 2. Filter out expired news and news for deleted assets
-            cachedNews = cachedNews.filter(n => {
-                const age = now - new Date(n.timestamp).getTime();
-                const symbolExists = symbols.includes(n.symbol); // Only keep news for current assets
-                return age < TWO_DAYS_MS && symbolExists;
-            });
-
-            // 3. Merge new alerts (avoid duplicates by ID or Title)
-            const newsMap = new Map<string, PortfolioAlert>();
-            [...cachedNews, ...fetchedAlerts].forEach(alert => {
-                // Create a unique key
-                const key = `${alert.symbol}-${alert.title}`;
-                if (!newsMap.has(key)) {
-                    // Normalize timestamp to string for storage consistency, then back to Date object if needed
-                    // But here we just keep the object as is, just ensuring we don't duplicate
-                    newsMap.set(key, alert);
-                }
-            });
-
-            // 4. Convert map back to array and sort
-            const allAlerts = Array.from(newsMap.values()).sort((a, b) =>
-                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-            );
-
-            // 5. Save back to cache
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('portfolio_news_cache', JSON.stringify(allAlerts));
-            }
-
-            // 6. Update State (Show top 20, scrollable)
-            setNewsAlerts(allAlerts.slice(0, 20));
-
-            // Update Health Score based on new alerts
-            setHealthScore(calculateHealthScore(currentItems, allAlerts));
-
-            // Trigger Notifications for high risk/opportunity news
-            if (user?.email && fetchedAlerts.length > 0) {
-                setAiStatus('Analyzing market risks and opportunities...');
-                // Map alerts to NewsArticle type for the service
-                const articles = fetchedAlerts.map(a => ({
-                    id: a.id,
-                    title: a.title,
-                    description: a.description,
-                    url: a.url,
-                    source: 'Market Feed',
-                    sentiment: a.sentiment,
-                    marketRelevance: a.relevanceScore * 10,
-                    publishedAt: a.timestamp.toISOString(),
-                    urlToImage: undefined
-                }));
-
-                // Fire and forget - don't block UI
-                NotificationService.analyzeAndNotify(user.email, symbols, articles);
-            }
-            setAiStatus('Portfolio Scan Complete: Optimized');
-            setTimeout(() => setAiStatus('System Monitoring Active'), 5000);
-        } catch (error) {
-            console.error('Error fetching news alerts:', error);
-            setAiStatus('Scan interrupted');
-        } finally {
-            setLoadingAlerts(false);
-            setIsScanning(false);
-        }
-    }, [newsService, user?.email]);
-    // Note: items dependency added for health score calculation
-
     // RESTORED: Fetch Portfolio
     const fetchPortfolio = useCallback(async () => {
         if (!user) return;
@@ -700,8 +617,7 @@ export default function PortfolioPage() {
             setTotalGain(gain);
 
             if (enrichedItems.length > 0) {
-                const symbols = enrichedItems.map((i: any) => i.symbol);
-                fetchNewsAlerts(symbols, enrichedItems);
+                fetchNewsAlerts();
 
                 // Calculate Daily Summary
                 const totalDailyShift = enrichedItems.reduce((acc, i) => acc + (i.value || 0) * ((i.daily_change || 0) / 100), 0);
@@ -723,6 +639,15 @@ export default function PortfolioPage() {
 
     useEffect(() => {
         if (user) fetchPortfolio();
+    }, [user, fetchPortfolio]);
+
+    // Added: 5 minute Auto-Refresh Loop
+    useEffect(() => {
+        if (!user) return;
+        const interval = setInterval(() => {
+            fetchPortfolio();
+        }, 5 * 60 * 1000); // 5 minutes
+        return () => clearInterval(interval);
     }, [user, fetchPortfolio]);
 
     // RESTORED: Add Asset
@@ -762,28 +687,6 @@ export default function PortfolioPage() {
             console.error(error);
         }
     };
-
-    // Load cached news on mount
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        const cachedNewsJson = localStorage.getItem('portfolio_news_cache');
-        if (cachedNewsJson) {
-            try {
-                const cachedNews: PortfolioAlert[] = JSON.parse(cachedNewsJson);
-                const now = Date.now();
-                const TWO_DAYS_MS = 48 * 60 * 60 * 1000;
-
-                // Client-side filter for expiry on load
-                const validNews = cachedNews.filter(n => (now - new Date(n.timestamp).getTime()) < TWO_DAYS_MS);
-
-                if (validNews.length > 0) {
-                    setNewsAlerts(validNews);
-                }
-            } catch (e) {
-                console.error("Failed to load news cache", e);
-            }
-        }
-    }, []);
 
 
     const initDeleteAsset = async (item: any) => {
@@ -886,26 +789,8 @@ export default function PortfolioPage() {
     }
 
     return (
-        <div className="min-h-screen bg-transparent p-6 lg:p-10 pt-24 lg:pt-28">
-            <div className="max-w-7xl mx-auto space-y-8">
-
-                {/* AI Thought Process Ticker */}
-                <div className="bg-gray-900 dark:bg-black rounded-xl p-3 shadow-inner border border-gray-700/50 flex items-center justify-between overflow-hidden">
-                    <div className="flex items-center space-x-3 flex-1 min-w-0">
-                        <div className={`w-2 h-2 rounded-full ${isScanning ? 'bg-primary-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'}`}></div>
-                        <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400 truncate">
-                            <span className="text-primary-500 mr-2">[AI Command]</span>
-                            {aiStatus}
-                        </p>
-                    </div>
-                    {isScanning && (
-                        <div className="flex items-center space-x-1 pr-2">
-                            <div className="w-1 h-3 bg-primary-500/30 rounded-full animate-[bounce_1s_infinite]"></div>
-                            <div className="w-1 h-4 bg-primary-500/50 rounded-full animate-[bounce_1.2s_infinite]"></div>
-                            <div className="w-1 h-3 bg-primary-500/30 rounded-full animate-[bounce_1s_infinite]"></div>
-                        </div>
-                    )}
-                </div>
+        <div className="min-h-screen bg-transparent p-6 lg:p-10 pt-16 lg:pt-20">
+            <div className="max-w-7xl mx-auto space-y-6">
 
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1437,11 +1322,11 @@ export default function PortfolioPage() {
                             <thead>
                                 <tr className="bg-gray-50/50 dark:bg-gray-700/30 border-b border-gray-200 dark:border-gray-700">
                                     <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400">Asset</th>
-                                    <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-right">Price</th>
-                                    <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-right">Day Chg</th>
-                                    <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-right">Holdings</th>
-                                    <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-right">Value</th>
-                                    <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-right">Return</th>
+                                    <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-right">Quantity</th>
+                                    <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-right">Avg Buy Price</th>
+                                    <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-right">Current Price</th>
+                                    <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-right">Current Total Value</th>
+                                    <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-right">Total Gain/Loss</th>
                                     <th className="px-6 py-4 font-semibold text-sm text-gray-500 dark:text-gray-400 text-center">Actions</th>
                                 </tr>
                             </thead>
@@ -1477,17 +1362,19 @@ export default function PortfolioPage() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-right font-medium">
-                                                {formatCurrency(item.current_price || 0)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className={`flex items-center justify-end ${item.daily_change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                    <span className="font-medium text-sm">{item.daily_change >= 0 ? '+' : ''}{item.daily_change.toFixed(2)}%</span>
-                                                </div>
-                                            </td>
                                             <td className="px-6 py-4 text-right">
                                                 <p className="text-gray-900 dark:text-white font-medium">{item.quantity}</p>
-                                                <p className="text-xs text-gray-500">Avg: {formatCurrency(item.avg_price)}</p>
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-medium text-gray-500 dark:text-gray-400">
+                                                {formatCurrency(item.avg_price)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-medium text-gray-900 dark:text-white">
+                                                <div className="flex flex-col items-end">
+                                                    <span>{formatCurrency(item.current_price || 0)}</span>
+                                                    <span className={`text-[10px] font-bold ${item.daily_change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                        {item.daily_change >= 0 ? '↑' : '↓'} {item.daily_change?.toFixed(2)}% Today
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">
                                                 {formatCurrency(item.value || 0)}
@@ -1495,7 +1382,7 @@ export default function PortfolioPage() {
                                             <td className="px-6 py-4 text-right">
                                                 <div className={`flex items-center justify-end ${(item.gain_loss || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                                                     {(item.gain_loss || 0) >= 0 ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
-                                                    <span className="font-medium">{formatCurrency(Math.abs(item.gain_loss || 0)).replace('-', '')}</span>
+                                                    <span className="font-bold whitespace-nowrap">{(item.gain_loss || 0) >= 0 ? '+' : ''}{formatCurrency(item.gain_loss || 0)}</span>
                                                 </div>
                                                 <p className={`text-[10px] text-right font-bold ${(item.gain_loss_percent || 0) >= 0 ? 'text-green-600/70' : 'text-red-600/70'}`}>
                                                     {item.gain_loss_percent?.toFixed(1)}% total

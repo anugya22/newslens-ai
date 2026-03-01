@@ -25,13 +25,14 @@ export default function LandingPage() {
     }, [settings.theme]);
 
     useEffect(() => {
-        // Automatically redirect logged-in users to the dashboard
-        if (user && !loading) {
+        // If they just logged in or hit the root URL natively, redirect them 
+        // But if they clicked the 'Home' button from the dashboard, this won't force them back instantly
+        if (user && !loading && typeof window !== 'undefined' && !document.referrer.includes('/dashboard')) {
             window.location.href = '/dashboard';
         }
     }, [user, loading]);
 
-    if (loading || user) {
+    if (loading) {
         return <div className="min-h-screen bg-white dark:bg-[#0B0C10]"></div>;
     }
 
@@ -95,7 +96,7 @@ export default function LandingPage() {
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-500"></span>
                         </span>
-                        <span>NewsLens AI 2.0 is Live</span>
+                        <span>NewsLens AI is Live</span>
                     </motion.div>
 
                     <motion.h1

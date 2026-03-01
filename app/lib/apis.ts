@@ -140,11 +140,22 @@ export class NewsService {
     this.rssService = new RSSService();
   }
 
-  async getNewsByTopic(topic: string): Promise<NewsArticle[]> {
+  async getNewsByTopic(topic: string, countryId: string = 'global'): Promise<NewsArticle[]> {
     const lowerTopic = topic.toLowerCase();
 
-    // Use Hybrid RSS Engine for specific financial/market topics
-    if (['market', 'finance', 'economy', 'stocks', 'crypto', 'india', 'business'].some(t => lowerTopic.includes(t))) {
+    // Map selected country to Google News GL/HL codes
+    const geoMap: Record<string, { gl: string, hl: string, ceid: string }> = {
+      'us': { gl: 'US', hl: 'en-US', ceid: 'US:en' },
+      'in': { gl: 'IN', hl: 'en-IN', ceid: 'IN:en' },
+      'uk': { gl: 'GB', hl: 'en-GB', ceid: 'GB:en' },
+      'eu': { gl: 'IE', hl: 'en-IE', ceid: 'IE:en' }, // Using Ireland as an English-speaking EU proxy
+      'global': { gl: 'US', hl: 'en-US', ceid: 'US:en' }
+    };
+
+    const geo = geoMap[countryId] || geoMap['global'];
+
+    // If explicit country requested (not global), bypass the static topic fallback to ensure localized results
+    if (countryId === 'global' && ['market', 'finance', 'economy', 'stocks', 'crypto', 'india', 'business'].some(t => lowerTopic.includes(t))) {
       try {
         if (lowerTopic.includes('india')) {
           return await this.rssService.getNewsByCategory('india');
@@ -164,7 +175,7 @@ export class NewsService {
     try {
       // Force recent news (last 7 days max) to avoid stale "9d ago" results
       const isServer = typeof window === 'undefined';
-      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}+when:7d&hl=en-US&gl=US&ceid=US:en`;
+      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}+when:7d&hl=${geo.hl}&gl=${geo.gl}&ceid=${geo.ceid}`;
       const finalUrl = isServer ? rssUrl : `/api/rss?url=${encodeURIComponent(rssUrl)}`;
       const response = await axios.get(finalUrl);
       const xmlData = response.data.contents || response.data;
@@ -429,7 +440,46 @@ export class MarketDataService {
         return result;
       }
     } catch (error) {
-      console.warn(`Finnhub error/no data for ${symbol}. Falling back to Alpha Vantage...`);
+      console.warn(`Finnhub error/no data for ${symbol}. Falling back to Nifty/Yahoo Finance...`);
+    }
+
+    // Fallback to Yahoo Finance (Highly reliable for NSE/BSE Indian stocks)
+    try {
+      let yfSymbol = symbol;
+      if (symbol.endsWith('.NS') || symbol.endsWith('.BO')) yfSymbol = symbol;
+      else if (symbol.endsWith('.NSE')) yfSymbol = symbol.replace('.NSE', '.NS');
+      else if (symbol.endsWith('.BSE')) yfSymbol = symbol.replace('.BSE', '.BO');
+      // If it's an Indian blue-chip without suffix, default to NSE
+      else if (['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'ITC'].includes(symbol)) yfSymbol = `${symbol}.NS`;
+
+      const yfResponse = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${yfSymbol}?interval=1d&range=1d`, {
+        timeout: 10000,
+      });
+
+      const resultArr = yfResponse.data?.chart?.result;
+      if (resultArr && resultArr.length > 0) {
+        const meta = resultArr[0].meta;
+        if (meta && meta.regularMarketPrice) {
+          const price = meta.regularMarketPrice;
+          const prevClose = meta.chartPreviousClose || price;
+          const result: MarketData = {
+            symbol: symbol,
+            price: price,
+            change: price - prevClose,
+            changePercent: prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0,
+            volume: meta.regularMarketVolume || 0,
+            lastUpdated: new Date().toISOString(),
+          };
+
+          this.localCache.set(symbol, { data: result, timestamp: Date.now() });
+          if (this.redis) {
+            this.redis.set(`quote:${symbol}`, result, { ex: 300 }).catch(e => console.error(e));
+          }
+          return result;
+        }
+      }
+    } catch (yfError) {
+      console.warn(`Nifty/Yahoo Finance fallback failed for ${symbol}. Falling back to Alpha Vantage...`);
     }
 
     // Fallback to Alpha Vantage (Good for Indian/Global stocks like RELIANCE.BSE)

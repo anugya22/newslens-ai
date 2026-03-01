@@ -129,12 +129,10 @@ export const useChatAPI = () => {
       if (isLimitError) {
         setShowLimitModal(true);
       } else {
-        toast.error(error.message || 'The AI service is temporarily unavailable');
+        toast.error(error.message || 'The AI service is temporarily unavailable'); // Only show in top right toast!
       }
 
-      useStore.getState().updateMessage(aiMessageId, {
-        content: "I'm having trouble connecting to my brain right now. Please check your connection or try again in a few moments.",
-      });
+      useStore.getState().removeMessage(aiMessageId); // Remove the empty bubble
     } finally {
       setLoading(false);
       setIsTyping(false);
@@ -218,9 +216,7 @@ export const useChatAPI = () => {
       } else {
         toast.error('Failed to analyze URL');
       }
-      useStore.getState().updateMessage(aiMessageId, {
-        content: "I'm having trouble analyzing this URL right now."
-      });
+      useStore.getState().removeMessage(aiMessageId);
     } finally {
       setLoading(false);
     }

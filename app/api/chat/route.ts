@@ -271,24 +271,38 @@ export async function POST(req: NextRequest) {
         let newsContext = 'No recent news articles retrieved for this topic.';
 
         // Detect if the user is asking about news or general topics
-        const newsKeywords = ['news', 'latest', 'updates', 'politics', 'headlines', 'what happened', 'breaking'];
+        const newsKeywords = ['news', 'latest', 'updates', 'politics', 'headlines', 'what happened', 'breaking', 'what is happening', 'right now', 'current'];
         const isNewsQuery = newsKeywords.some(k => message.toLowerCase().includes(k));
 
         if (isNewsQuery || marketMode || cryptoMode) {
             try {
                 // Determine topic: Use detected ticker OR keywords
                 let newsTopic = detectedTicker || 'breaking news';
-                if (message.toLowerCase().includes('india')) newsTopic = 'india';
-                if (message.toLowerCase().includes('crypto')) newsTopic = 'crypto';
-                if (message.toLowerCase().includes('politics')) {
-                    newsTopic = message.toLowerCase().includes('india') ? 'india politics' : 'politics';
+
+                const msgLower = message.toLowerCase();
+                if (msgLower.includes('india')) newsTopic = 'india';
+                if (msgLower.includes('crypto')) newsTopic = 'crypto';
+                if (msgLower.includes('politics')) {
+                    newsTopic = msgLower.includes('india') ? 'india politics' : 'politics';
+                }
+
+                // Dynamic extraction specifically for "what is happening in X" or "news about X"
+                const topicMatch = msgLower.match(/(what is happening in|news about|latest on|updates on)\s+([a-zA-Z\s]+)/i);
+                if (topicMatch && topicMatch[2]) {
+                    const extracted = topicMatch[2].trim().replace(/\b(now|right now|today|recently|lately)\b/g, '').trim();
+                    if (extracted.length > 2) {
+                        newsTopic = extracted;
+                    }
                 }
 
                 const articles = await newsService.getNewsByTopic(newsTopic);
                 if (articles && articles.length > 0) {
-                    newsContext = articles.slice(0, 5).map(a =>
-                        `[${a.source}] ${a.title}: ${a.description} (${a.url})`
-                    ).join('\n\n');
+                    newsContext = articles.slice(0, 5).map(a => {
+                        const dateStr = new Date(a.publishedAt).toLocaleString('en-US', {
+                            weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+                        });
+                        return `[${a.source} | Published: ${dateStr}] ${a.title}: ${a.description} (${a.url})`;
+                    }).join('\n\n');
                 }
             } catch (err) {
                 console.error('News Fetch Error:', err);
@@ -300,10 +314,15 @@ export async function POST(req: NextRequest) {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         });
 
+        let chatModeWarning = '';
+        if (!marketMode && !cryptoMode && (uniqueTickers.length > 0 || isCryptoQuery)) {
+            chatModeWarning = `\n\n🚨 [CRITICAL ALERT]: The user is asking about specific financial assets, but is currently in 'General News Mode'. Because you are in this mode, LIVE PRICING DATA WAS DELIBERATELY NOT FETCHED. Do NOT hallucinate prices. Instead, explicitly and politely instruct the user to toggle "Market Mode" or "Crypto Advisory" on the top navigation bar. Tell them that doing so will pull real-time API pricing and automatically render interactive TradingView candlestick charts.`;
+        }
+
         const messagesPayload = [
             {
                 role: 'system',
-                content: `You are NewsLens AI, an elite real-time financial intelligence and news analysis system.
+                content: `You are NewsLens AI, an elite real-time financial intelligence and news analysis system.${chatModeWarning}
                 You operate using live internet-connected data supplied by the system, including:
                 - Real-time financial market prices (Finnhub, Alpha Vantage, CoinGecko)
                 - Scraped news articles & RSS feeds
@@ -359,6 +378,7 @@ export async function POST(req: NextRequest) {
                 • START with a high-level "Quick Take" or "Market Vibe" using emojis. 📈
                 • WEAVE what we know (grounded facts) and what's missing (data gaps) into your story naturally. Mention gaps as "Temporary blind spots" rather than system errors.
                 • USE emojis (📊, 🛡️, 💡, 🚀) to highlight key segments without using hard labels like "Insight:".
+                • PROACTIVE CLARIFICATION: If the provided 'RECENT NEWS CONTEXT' lacks specific information on the user's requested topic (e.g., they ask about "Iran" but no Iran news was fetched), explicitly state this and ask a follow-up clarification question. Ask if they want you to monitor it or if they want to know something specific about it.
                 • FINISH with a helpful outlook and a friendly, interactive follow-up question. (e.g., "Want a deeper look at the tech sector next?", "Curious about the long-term trend?")
 
                 TONE RULES:

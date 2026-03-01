@@ -11,13 +11,16 @@ import {
   X,
   BarChart3,
   Wallet,
-  Bitcoin,
   MessageCircle,
-  Clock
+  Clock,
+  Home,
+  Bitcoin,
+  LogOut
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button, GlassCard } from '../ui/Button';
 import { useStore } from '../../lib/store';
+import { useAuth } from '../../context/AuthContext';
 import APISettings from '../Settings/APISettings';
 
 interface Notification {
@@ -42,10 +45,20 @@ const Header: React.FC = () => {
     clearMessages
   } = useStore();
 
+  const { user, signOut } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const toggleTheme = () => {
     const newTheme = settings.theme === 'light' ? 'dark' : 'light';
@@ -111,6 +124,15 @@ const Header: React.FC = () => {
             </Button>
 
             <div className="w-px h-6 bg-gray-200 dark:bg-white/20" />
+
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Home className="w-4 h-4" />}
+              onClick={() => router.push('/')}
+            >
+              Home
+            </Button>
 
             <Button
               variant="ghost"
@@ -200,6 +222,16 @@ const Header: React.FC = () => {
               icon={<Settings className="w-4 h-4" />}
               onClick={() => setShowSettings(true)}
             />
+
+            {user && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+                icon={<LogOut className="w-4 h-4" />}
+                onClick={handleSignOut}
+              />
+            )}
 
             <div className="md:hidden">
               <Button

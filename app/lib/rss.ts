@@ -57,7 +57,15 @@ export class RSSService {
             }
         });
 
-        // Sort by date (newest first)
+        // Filter: Keep only articles published within the last 48 hours
+        const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
+
+        allArticles = allArticles.filter(article => {
+            const articleTime = new Date(article.publishedAt).getTime();
+            return articleTime >= fortyEightHoursAgo && articleTime <= Date.now() + (60 * 60 * 1000); // Also prevent far future dates
+        });
+
+        // Sort by strict Date (newest first)
         return allArticles.sort((a, b) =>
             new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
         );
@@ -75,6 +83,14 @@ export class RSSService {
             if (result.status === 'fulfilled') {
                 allArticles = [...allArticles, ...result.value];
             }
+        });
+
+        // Filter: Keep only articles published within the last 48 hours
+        const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
+
+        allArticles = allArticles.filter(article => {
+            const articleTime = new Date(article.publishedAt).getTime();
+            return articleTime >= fortyEightHoursAgo && articleTime <= Date.now() + (60 * 60 * 1000);
         });
 
         return allArticles.sort((a, b) =>
@@ -108,7 +124,15 @@ export class RSSService {
 
                 const title = titleMatch ? titleMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim() : 'No Title';
                 const url = linkMatch ? linkMatch[1].trim() : '';
-                const publishedAt = pubDateMatch ? pubDateMatch[1].trim() : new Date().toISOString();
+
+                // Parse date safely
+                let publishedAt = new Date().toISOString();
+                if (pubDateMatch) {
+                    const parsedDate = new Date(pubDateMatch[1].trim());
+                    if (!isNaN(parsedDate.getTime())) {
+                        publishedAt = parsedDate.toISOString();
+                    }
+                }
 
                 let rawDescription = descMatch ? descMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim() : '';
                 let rawContent = contentMatch ? contentMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim() : '';

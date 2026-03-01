@@ -9,8 +9,14 @@ import {
   BookmarkPlus,
   Share2,
   BarChart3,
-  Bitcoin
+  Bitcoin,
+  Globe,
+  Tag,
+  RefreshCw,
+  MessageSquare,
+  ChevronDown
 } from 'lucide-react';
+import { useChatAPI } from '../../hooks/useChat';
 import { GlassCard, Badge, Button } from '../ui/Button';
 import { NewsArticle } from '../../types';
 import { useStore } from '../../lib/store';
@@ -25,16 +31,76 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
   const { news, setNews, marketMode, cryptoMode } = useStore();
   const [loading, setLoading] = useState(false);
   const [trendingTopics, setTrendingTopics] = useState<string[]>([]);
+  const [selectedCountry, setSelectedCountry] = useState<string>('global');
+  const [selectedTopic, setSelectedTopic] = useState<string>('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // States for dropdown arrow animation
+  const [isCountryOpen, setIsCountryOpen] = useState(false);
+  const [isTopicOpen, setIsTopicOpen] = useState(false);
   const newsService = new NewsService();
+  const chatAPI = useChatAPI();
+
+  const COUNTRIES = [
+    { id: 'global', name: 'Global' },
+    { id: 'us', name: 'United States' },
+    { id: 'in', name: 'India' },
+    { id: 'uk', name: 'United Kingdom' },
+    { id: 'eu', name: 'Europe' }
+  ];
+
+  const TOPICS = [
+    { id: 'all', name: 'All Topics' },
+    { id: 'business', name: 'Business' },
+    { id: 'technology', name: 'Technology' },
+    { id: 'finance', name: 'Finance' },
+    { id: 'crypto', name: 'Crypto' }
+  ];
 
   useEffect(() => {
     loadTrendingTopics();
-    if (relatedTopic) {
-      loadRelatedNews(relatedTopic);
-    } else {
-      loadDefaultNews();
+  }, []);
+
+  useEffect(() => {
+    let query = relatedTopic || '';
+
+    if (selectedTopic !== 'all') {
+      query += ` ${selectedTopic}`;
     }
-  }, [relatedTopic]);
+
+    if (selectedCountry !== 'global') {
+      const countryName = COUNTRIES.find(c => c.id === selectedCountry)?.name || '';
+      query += ` ${countryName}`;
+    }
+
+    if (query.trim()) {
+      loadRelatedNews(query.trim(), selectedCountry);
+    } else {
+      loadDefaultNews(selectedCountry);
+    }
+  }, [relatedTopic, selectedCountry, selectedTopic]);
+
+  // Auto-refresh every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      handleRefresh();
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [relatedTopic, selectedCountry, selectedTopic]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    let query = relatedTopic || '';
+    if (selectedTopic !== 'all') query += ` ${selectedTopic}`;
+
+    if (query.trim()) {
+      await loadRelatedNews(query.trim(), selectedCountry);
+    } else {
+      await loadDefaultNews(selectedCountry);
+    }
+    setIsRefreshing(false);
+  };
+
 
   const loadTrendingTopics = async () => {
     try {
@@ -45,10 +111,10 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
     }
   };
 
-  const loadRelatedNews = async (topic: string) => {
+  const loadRelatedNews = async (topic: string, country: string) => {
     setLoading(true);
     try {
-      const articles = await newsService.getNewsByTopic(topic);
+      const articles = await newsService.getNewsByTopic(topic, country);
       setNews(articles);
     } catch (error) {
       console.error('Failed to load related news:', error);
@@ -57,10 +123,10 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
     }
   };
 
-  const loadDefaultNews = async () => {
+  const loadDefaultNews = async (country: string) => {
     setLoading(true);
     try {
-      const articles = await newsService.getNewsByTopic('breaking news');
+      const articles = await newsService.getNewsByTopic('breaking news', country);
       setNews(articles);
     } catch (error) {
       console.error('Failed to load news:', error);
@@ -70,7 +136,8 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
   };
 
   const handleTopicClick = (topic: string) => {
-    loadRelatedNews(topic);
+    // If user clicks a trending topic, we temporarily override the dropdowns
+    loadRelatedNews(topic, selectedCountry);
   };
 
   const handleBookmark = (article: NewsArticle) => {
@@ -144,21 +211,90 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
       >
         <GlassCard className="p-4 flex flex-col h-auto">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {relatedTopic ? `Latest: ${relatedTopic}` : 'Latest News'}
-            </h2>
-            {marketMode && (
-              <Badge variant="info" size="sm">
-                <BarChart3 className="w-3 h-3 mr-1" />
-                Market Focus
-              </Badge>
-            )}
-            {cryptoMode && (
-              <Badge variant="warning" size="sm">
-                <Bitcoin className="w-3 h-3 mr-1" />
-                Crypto Focus
-              </Badge>
-            )}
+            <div className="flex items-center space-x-2">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {relatedTopic ? `Latest: ${relatedTopic}` : 'Latest News'}
+              </h2>
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing || loading}
+                className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                title="Refresh News"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+            <div className="flex gap-2">
+              {marketMode && (
+                <Badge variant="info" size="sm">
+                  <BarChart3 className="w-3 h-3 mr-1" />
+                  Market Focus
+                </Badge>
+              )}
+              {cryptoMode && (
+                <Badge variant="warning" size="sm">
+                  <Bitcoin className="w-3 h-3 mr-1" />
+                  Crypto Focus
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {/* Filters Row */}
+          <div className="flex flex-wrap gap-3 mb-6">
+            <div className="relative flex-1 min-w-[120px]">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Globe className="h-4 w-4 text-gray-400" />
+              </div>
+              <select
+                value={selectedCountry}
+                onFocus={() => setIsCountryOpen(true)}
+                onBlur={() => setIsCountryOpen(false)}
+                onChange={(e) => {
+                  setSelectedCountry(e.target.value);
+                  setIsCountryOpen(false);
+                }}
+                className="block w-full pl-9 pr-10 py-2 text-sm bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 dark:text-gray-100 appearance-none cursor-pointer outline-none transition-all"
+              >
+                {COUNTRIES.map(country => (
+                  <option key={country.id} value={country.id} className="bg-white dark:bg-gray-800">
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <motion.div animate={{ rotate: isCountryOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </motion.div>
+              </div>
+            </div>
+
+            <div className="relative flex-1 min-w-[120px]">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Tag className="h-4 w-4 text-gray-400" />
+              </div>
+              <select
+                value={selectedTopic}
+                onFocus={() => setIsTopicOpen(true)}
+                onBlur={() => setIsTopicOpen(false)}
+                onChange={(e) => {
+                  setSelectedTopic(e.target.value);
+                  setIsTopicOpen(false);
+                }}
+                className="block w-full pl-9 pr-10 py-2 text-sm bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 dark:text-gray-100 appearance-none cursor-pointer outline-none transition-all"
+              >
+                {TOPICS.map(topic => (
+                  <option key={topic.id} value={topic.id} className="bg-white dark:bg-gray-800">
+                    {topic.name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <motion.div animate={{ rotate: isTopicOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </motion.div>
+              </div>
+            </div>
           </div>
 
           {loading ? (
@@ -232,7 +368,7 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
                     </p>
 
                     {/* Article Footer */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mt-auto">
                       <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-300">
                         <Clock className="w-3 h-3" />
                         <span className="font-medium">{formatTimeAgo(article.publishedAt)}</span>
@@ -240,15 +376,17 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
 
                       <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
-                          variant="ghost"
+                          variant="secondary"
                           size="sm"
-                          icon={<BookmarkPlus className="w-3 h-3" />}
+                          icon={<MessageSquare className="w-3 h-3 text-primary-500" />}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleBookmark(article);
+                            chatAPI.sendMessage(`Explain this news piece to me in easy terms and tell me what will be impacted: ${article.url}`);
                           }}
-                          className="p-2 hover:bg-white/20 rounded-lg"
-                        />
+                          className="p-2 py-1 hover:bg-white/20 rounded-lg text-xs font-bold"
+                        >
+                          Explain this
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"

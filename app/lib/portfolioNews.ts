@@ -1,7 +1,7 @@
 import { NewsArticle } from '../types';
 import { RSSService } from './rss';
 
-interface PortfolioAlert {
+export interface PortfolioAlert {
     id: string;
     symbol: string;
     title: string;
@@ -20,41 +20,62 @@ export class PortfolioNewsService {
     }
 
     /**
-     * Scan news for mentions of specific stock symbols
+     * Actively query Google News for specific stock symbols to guarantee news discovery.
      */
     async getNewsForSymbols(symbols: string[]): Promise<PortfolioAlert[]> {
         try {
-            // Fetch all news from RSS
-            const allNews = await this.rssService.getAllNews();
-
             const alerts: PortfolioAlert[] = [];
+            const CORS_PROXY = 'https://api.allorigins.win/get?url=';
 
-            // Filter news that mentions any of the portfolio symbols
-            for (const article of allNews) {
-                for (const symbol of symbols) {
-                    const relevanceScore = this.calculateRelevance(article, symbol);
+            // Process all symbols in parallel
+            const fetchPromises = symbols.map(async (symbol) => {
+                const query = encodeURIComponent(`${symbol} stock news`);
+                const rssUrl = `https://news.google.com/rss/search?q=${query}&hl=en-US&gl=US&ceid=US:en`;
 
-                    if (relevanceScore > 0.3) { // Threshold for relevance
-                        alerts.push({
-                            id: `${symbol}-${article.id}`,
-                            symbol: symbol,
-                            title: article.title,
-                            description: article.description,
-                            url: article.url,
-                            sentiment: this.detectSentiment(article.title + ' ' + article.description),
-                            timestamp: new Date(article.publishedAt),
-                            relevanceScore: relevanceScore
-                        });
+                try {
+                    // Use allorigins proxy to bypass CORS on edge/client if called directly
+                    const response = await fetch(`${CORS_PROXY}${encodeURIComponent(rssUrl)}`, { cache: 'no-store' });
+                    const data = await response.json();
+
+                    if (data && data.contents) {
+                        // Very simple regex parsing for RSS XML (faster than full DOM parser for this specific use case)
+                        const items = data.contents.match(/<item>([\s\S]*?)<\/item>/g) || [];
+
+                        // Take top 3 most recent absolute news items per stock
+                        for (let i = 0; i < Math.min(3, items.length); i++) {
+                            const item = items[i];
+                            const titleMatch = item.match(/<title>([\s\S]*?)<\/title>/);
+                            const linkMatch = item.match(/<link>([\s\S]*?)<\/link>/);
+                            const pubDateMatch = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+
+                            if (titleMatch && linkMatch) {
+                                // Clean up title (Google News appends ' - Source')
+                                let title = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+                                const url = linkMatch[1].trim();
+                                const pubDate = pubDateMatch ? new Date(pubDateMatch[1].trim()) : new Date();
+
+                                alerts.push({
+                                    id: `${symbol}-${Date.now()}-${i}`,
+                                    symbol: symbol,
+                                    title: title,
+                                    description: `Latest real-time update for ${symbol}.`, // Google News descriptions are often just the title anyway
+                                    url: url,
+                                    sentiment: this.detectSentiment(title),
+                                    timestamp: pubDate,
+                                    relevanceScore: 0.9 // Direct search is highly relevant
+                                });
+                            }
+                        }
                     }
+                } catch (e) {
+                    console.error(`Failed to fetch news for ${symbol}:`, e);
                 }
-            }
-
-            // Sort by relevance and recency
-            return alerts.sort((a, b) => {
-                const scoreA = a.relevanceScore * 0.7 + (new Date(b.timestamp).getTime() / 1000000000) * 0.3;
-                const scoreB = b.relevanceScore * 0.7 + (new Date(a.timestamp).getTime() / 1000000000) * 0.3;
-                return scoreB - scoreA;
             });
+
+            await Promise.all(fetchPromises);
+
+            // Sort all collected alerts by recency
+            return alerts.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
         } catch (error) {
             console.error('Error fetching portfolio news:', error);
