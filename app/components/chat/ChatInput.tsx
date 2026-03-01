@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Paperclip, Mic, Square, Link, TrendingUp } from 'lucide-react';
 import { useStore } from '../../lib/store';
 import { useChatAPI } from '../../hooks/useChat';
@@ -86,6 +86,8 @@ const ChatInput = () => {
     }
   };
 
+  const [showPrompts, setShowPrompts] = useState(true);
+
   const insertSampleQuery = (query: string) => {
     setInput(query);
     textareaRef.current?.focus();
@@ -93,25 +95,54 @@ const ChatInput = () => {
 
   return (
     <div className="space-y-3">
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { label: 'Latest Tech News', icon: TrendingUp, query: "What's the latest technology news?" },
-          { label: 'Market Analysis', icon: TrendingUp, query: "Analyze current market trends" },
-          { label: 'Parse Link', icon: Link, query: "Analyze this article: " },
-        ].map((action, index) => (
-          <motion.button
-            key={index}
-            onClick={() => insertSampleQuery(action.query)}
-            className="flex items-center space-x-2 px-3 py-1.5 bg-white/50 dark:bg-gray-800/50 rounded-full border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 transition-all duration-200 text-sm text-gray-700 dark:text-gray-200"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+      {/* Quick Actions Toggle */}
+      <div className="flex justify-center -mb-2">
+        <button
+          type="button"
+          onClick={() => setShowPrompts(!showPrompts)}
+          className="flex items-center justify-center p-1 bg-white/50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700/50 rounded-full transition-all duration-300 text-gray-500 dark:text-gray-400 group z-10"
+          title={showPrompts ? "Hide suggestions" : "Show suggestions"}
+        >
+          <motion.div
+            animate={{ rotate: showPrompts ? 0 : 180 }}
+            transition={{ duration: 0.3 }}
           >
-            <action.icon className="w-3 h-3" />
-            <span>{action.label}</span>
-          </motion.button>
-        ))}
+            <svg className="w-4 h-4 group-hover:text-primary-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </motion.div>
+        </button>
       </div>
+
+      {/* Quick Actions Container */}
+      <AnimatePresence>
+        {showPrompts && (
+          <motion.div
+            initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
+            animate={{ height: 'auto', opacity: 1, overflow: 'visible' }}
+            exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="flex flex-wrap gap-2 justify-center"
+          >
+            {[
+              { label: 'Latest Tech News', icon: TrendingUp, query: "What's the latest technology news?" },
+              { label: 'Market Analysis', icon: TrendingUp, query: "Analyze current market trends" },
+              { label: 'Parse Link', icon: Link, query: "Analyze this article: " },
+            ].map((action, index) => (
+              <motion.button
+                key={index}
+                onClick={() => insertSampleQuery(action.query)}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-white/50 dark:bg-gray-800/50 rounded-full border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 transition-all duration-200 text-sm text-gray-700 dark:text-gray-200"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <action.icon className="w-3 h-3" />
+                <span>{action.label}</span>
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Input Form */}
       <form onSubmit={handleSubmit} className="relative">
