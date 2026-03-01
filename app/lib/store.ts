@@ -115,8 +115,24 @@ export const useStore = create<AppStore>()(
       setLoading: (loading) => set({ isLoading: loading }),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       setHistorySidebarOpen: (open) => set({ historySidebarOpen: open }),
-      setMarketMode: (mode) => set({ marketMode: mode, cryptoMode: mode ? false : false }), // Disable cryptoMode if marketMode is enabled
-      setCryptoMode: (mode) => set({ cryptoMode: mode, marketMode: mode ? false : false }), // Disable marketMode if cryptoMode is enabled
+      setMarketMode: (mode) => set((state) => {
+        if (state.marketMode === mode) return {};
+        const shouldClear = state.messages.length > 0;
+        return {
+          marketMode: mode,
+          cryptoMode: mode ? false : state.cryptoMode,
+          ...(shouldClear ? { messages: [], sessionId: generateSessionId() } : {})
+        };
+      }),
+      setCryptoMode: (mode) => set((state) => {
+        if (state.cryptoMode === mode) return {};
+        const shouldClear = state.messages.length > 0;
+        return {
+          cryptoMode: mode,
+          marketMode: mode ? false : state.marketMode,
+          ...(shouldClear ? { messages: [], sessionId: generateSessionId() } : {})
+        };
+      }),
       setSelectedArticle: (article) => set({ selectedArticle: article }),
       setSelectedAnalysis: (analysis) => set({ selectedAnalysis: analysis }),
       setPendingExplanation: (text) => set({ pendingExplanation: text }),

@@ -94,12 +94,7 @@ const Header: React.FC = () => {
               variant={marketMode ? 'primary' : 'ghost'}
               size="sm"
               icon={<BarChart3 className="w-4 h-4" />}
-              onClick={() => {
-                if (!marketMode) {
-                  setCryptoMode(false);
-                }
-                setMarketMode(!marketMode);
-              }}
+              onClick={() => setMarketMode(!marketMode)}
               className={marketMode ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-600' : ''}
             >
               Market Mode
@@ -109,12 +104,7 @@ const Header: React.FC = () => {
               variant={cryptoMode ? 'primary' : 'ghost'}
               size="sm"
               icon={<Bitcoin className="w-4 h-4" />}
-              onClick={() => {
-                if (!cryptoMode) {
-                  setMarketMode(false);
-                }
-                setCryptoMode(!cryptoMode);
-              }}
+              onClick={() => setCryptoMode(!cryptoMode)}
               className={cryptoMode ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-600' : ''}
             >
               Crypto Advisory
@@ -135,8 +125,6 @@ const Header: React.FC = () => {
             >
               Chat
             </Button>
-
-
 
             <Button
               variant="ghost"
