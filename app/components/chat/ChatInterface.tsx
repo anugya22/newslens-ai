@@ -13,6 +13,12 @@ const ChatInterface = () => {
   const { messages, isLoading, marketMode, cryptoMode, clearMessages, setPendingExplanation, setSelectedAnalysis } = useStore();
   const { sendMessage } = useChatAPI();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [hasHydrated, setHasHydrated] = React.useState(false);
+
+  // Handle Zustand hydration
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
 
   const scrollToBottom = (force = false) => {
@@ -34,6 +40,8 @@ const ChatInterface = () => {
     const lastMessage = messages[messages.length - 1];
     scrollToBottom(lastMessage?.type === 'user');
   }, [messages]);
+
+  if (!hasHydrated) return null;
 
   return (
     <div className="flex flex-col h-full bg-transparent min-h-0 relative">

@@ -96,7 +96,6 @@ const Header: React.FC = () => {
               icon={<BarChart3 className="w-4 h-4" />}
               onClick={() => {
                 if (!marketMode) {
-                  clearMessages();
                   setCryptoMode(false);
                 }
                 setMarketMode(!marketMode);
@@ -112,7 +111,6 @@ const Header: React.FC = () => {
               icon={<Bitcoin className="w-4 h-4" />}
               onClick={() => {
                 if (!cryptoMode) {
-                  clearMessages();
                   setMarketMode(false);
                 }
                 setCryptoMode(!cryptoMode);
@@ -129,7 +127,6 @@ const Header: React.FC = () => {
               size="sm"
               icon={<MessageSquare className="w-4 h-4" />}
               onClick={() => {
-                if (marketMode || cryptoMode) clearMessages();
                 setMarketMode(false);
                 setCryptoMode(false);
                 router.push('/dashboard');
