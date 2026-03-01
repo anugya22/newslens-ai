@@ -85,8 +85,9 @@ const Header: React.FC = () => {
             />
             {/* Logo and Title */}
             <motion.div
-              className="flex items-center space-x-3"
+              className="flex items-center space-x-3 cursor-pointer"
               whileHover={{ scale: 1.02 }}
+              onClick={() => router.push('/?v=home')}
             >
               <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500">
                 <TrendingUp className="w-6 h-6 text-white" />
@@ -129,7 +130,7 @@ const Header: React.FC = () => {
               variant="ghost"
               size="sm"
               icon={<Home className="w-4 h-4" />}
-              onClick={() => router.push('/')}
+              onClick={() => router.push('/?v=home')}
             >
               Home
             </Button>

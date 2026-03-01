@@ -25,16 +25,17 @@ export default function LandingPage() {
     }, [settings.theme]);
 
     useEffect(() => {
-        // Only redirect if:
-        // 1. User is logged in
-        // 2. Auth is not loading
-        // 3. We are NOT specifically navigating back to Home (check if referrer is the same site but a different path)
-        const isInternalNavigation = document.referrer &&
-            document.referrer.includes(window.location.host) &&
-            !document.referrer.endsWith('/') &&
-            !document.referrer.includes('/login');
+        if (typeof window === 'undefined') return;
 
-        if (user && !loading && !isInternalNavigation) {
+        // Search the URL for intentional navigation
+        const params = new URLSearchParams(window.location.search);
+        const isManualHome = params.get('v') === 'home';
+
+        // Only redirect if: 
+        // 1. User is logged in
+        // 2. Auth finished loading
+        // 3. This is NOT a "Return to Home" click (?v=home)
+        if (user && !loading && !isManualHome) {
             router.push('/dashboard');
         }
     }, [user, loading, router]);

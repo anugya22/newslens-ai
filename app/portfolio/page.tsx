@@ -355,18 +355,25 @@ export default function PortfolioPage() {
     // AI Helper: Robust call with enforced plain text
     const callAI = async (prompt: string, systemMsg: string = 'You are a professional financial assistant.') => {
         try {
-            const res = await axios.post('/api/portfolio/insight', {
-                prompt,
-                systemMsg
+            const response = await fetch('/api/portfolio/insight', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, systemMsg })
             });
 
-            if (res.data?.content) {
-                return res.data.content;
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.details || errorData.error || `HTTP error! status: ${response.status}`);
             }
-            throw new Error('Empty response');
+
+            const data = await response.json();
+            if (data.content) {
+                return data.content;
+            }
+            throw new Error('AI returned no content');
         } catch (e: any) {
             console.error('Portfolio AI Error:', e.message);
-            throw new Error('Our AI advisors are currently busy. Please try again in a few moments.');
+            throw e;
         }
     };
 
@@ -412,8 +419,9 @@ export default function PortfolioPage() {
             const content = await callAI(prompt, 'Finance AI. Risk focus.');
             setAiInsight(content);
             setLastInsightHash(currentHash);
-        } catch (error) {
-            setAiInsight('Portfolio summary active. Check assets for live details.');
+        } catch (error: any) {
+            console.error('Insight generation failed:', error.message);
+            setAiInsight(`Advisory offline: ${error.message}. Check assets for live details.`);
         } finally {
             setLoadingInsight(false);
         }
