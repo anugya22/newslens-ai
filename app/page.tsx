@@ -122,8 +122,17 @@ export default function LandingPage() {
                     <motion.p
                         initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.15 }}
+                        className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-700 to-gray-500 dark:from-gray-300 dark:to-gray-500 max-w-3xl mx-auto mb-6"
+                    >
+                        NewsLens is an AI platform that analyzes news and explains how it affects your investments.
+                    </motion.p>
+
+                    <motion.p
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
-                        className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed font-medium"
+                        className="text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed font-medium"
                     >
                         Chat with real-time global news, analyze stock trends, and manage your portfolio with an intelligent, autonomous financial agent.
                     </motion.p>

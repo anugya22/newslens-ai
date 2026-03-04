@@ -10,7 +10,7 @@ import {
     PieChart, Wallet, TrendingUp, Plus, Trash2,
     ArrowUpRight, ArrowDownRight, RefreshCw, Lock,
     Bell, TrendingDown, AlertTriangle, ExternalLink,
-    BrainCircuit, X
+    BrainCircuit, X, ArrowLeft
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { MarkdownRenderer } from '../components/ui/MarkdownRenderer';
@@ -21,6 +21,7 @@ import { NotificationService } from '../lib/notifications';
 import axios from 'axios';
 import { AI_CONFIG } from '../lib/config';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface PortfolioItem {
     id: string;
@@ -596,6 +597,7 @@ export default function PortfolioPage() {
 
             setItems(enrichedItems);
             generatePortfolioInsight(enrichedItems);
+            setHealthScore(calculateHealthScore(enrichedItems, newsAlerts));
 
             const total = enrichedItems.reduce((acc: number, item: any) => acc + (item.value || 0), 0);
             const gain = enrichedItems.reduce((acc: number, item: any) => acc + (item.gain_loss || 0), 0);
@@ -627,6 +629,15 @@ export default function PortfolioPage() {
     useEffect(() => {
         if (user) fetchPortfolio();
     }, [user, fetchPortfolio]);
+
+    // Recalculate health score whenever alerts change, since fetchPortfolio handles `items` dependency
+    useEffect(() => {
+        if (items.length > 0) {
+            setHealthScore(calculateHealthScore(items, newsAlerts));
+        } else {
+            setHealthScore(null);
+        }
+    }, [newsAlerts, items]);
 
     // Added: 5 minute Auto-Refresh Loop
     useEffect(() => {
@@ -737,38 +748,44 @@ export default function PortfolioPage() {
     if (!user) {
         return (
             <div className="flex h-screen flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 p-4 overflow-y-auto">
-                <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center space-y-6 my-8">
-                    <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mx-auto">
-                        <Lock className="w-8 h-8 text-primary-600 dark:text-primary-400" />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                            Sign in to NewsLens AI
-                        </h2>
-                        <p className="text-gray-500 dark:text-gray-400">
-                            Track your assets, analyze performance, and get AI insights for your portfolio.
-                        </p>
-                    </div>
-
-                    <div className="space-y-4">
-                        <button
-                            onClick={signInWithGoogle}
-                            className="w-full py-3 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-center space-x-2 font-medium text-gray-700 dark:text-gray-200"
-                        >
-                            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 bg-white p-0.5 rounded-full" />
-                            <span>Continue with Google</span>
-                        </button>
-
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t border-gray-300 dark:border-gray-600"></span>
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-white dark:bg-gray-800 px-2 text-gray-500">Or continue with email</span>
-                            </div>
+                <div className="max-w-md w-full relative z-10 text-left">
+                    <Link href="/" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 dark:hover:text-white transition group mb-4 lg:mb-8">
+                        <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition" />
+                        Back to Home
+                    </Link>
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center space-y-6 mb-8 mt-2">
+                        <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mx-auto">
+                            <Lock className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                                Sign in to NewsLens AI
+                            </h2>
+                            <p className="text-gray-500 dark:text-gray-400">
+                                Track your assets, analyze performance, and get AI insights for your portfolio.
+                            </p>
                         </div>
 
-                        <AuthForm />
+                        <div className="space-y-4">
+                            <button
+                                onClick={signInWithGoogle}
+                                className="w-full py-3 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-center space-x-2 font-medium text-gray-700 dark:text-gray-200"
+                            >
+                                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 bg-white p-0.5 rounded-full" />
+                                <span>Continue with Google</span>
+                            </button>
+
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t border-gray-300 dark:border-gray-600"></span>
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-white dark:bg-gray-800 px-2 text-gray-500">Or continue with email</span>
+                                </div>
+                            </div>
+
+                            <AuthForm />
+                        </div>
                     </div>
                 </div>
             </div>

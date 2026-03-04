@@ -25,7 +25,7 @@ export class PortfolioNewsService {
     async getNewsForSymbols(symbols: string[]): Promise<PortfolioAlert[]> {
         try {
             const alerts: PortfolioAlert[] = [];
-            const CORS_PROXY = 'https://api.allorigins.win/get?url=';
+            const CORS_PROXY = '/api/rss?url=';
 
             // Process all symbols in parallel
             const fetchPromises = symbols.map(async (symbol) => {
@@ -33,7 +33,7 @@ export class PortfolioNewsService {
                 const rssUrl = `https://news.google.com/rss/search?q=${query}&hl=en-US&gl=US&ceid=US:en`;
 
                 try {
-                    // Use allorigins proxy to bypass CORS on edge/client if called directly
+                    // Use internal proxy to bypass CORS
                     const response = await fetch(`${CORS_PROXY}${encodeURIComponent(rssUrl)}`, { cache: 'no-store' });
                     const data = await response.json();
 
