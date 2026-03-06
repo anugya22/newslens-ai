@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
     try {
-        const { prompt, systemMsg } = await req.json();
+        const { prompt, systemMsg, isShort } = await req.json();
 
         const apiKey = process.env.OPENROUTER_API_KEY;
         if (!apiKey) {
@@ -14,7 +14,9 @@ export async function POST(req: NextRequest) {
 
         const primaryModel = 'meta-llama/llama-3.3-70b-instruct:free';
         const fallbackModel = 'stepfun/step-3.5-flash:free';
-        const formattingInstruction = " IMPORTANT: Be engaging, highly conversational, and format the output so it's very easy to read for users. DO NOT use markdown tables or the `|` character. DO NOT use bulleted asterisk lists `*`. Instead, use proper markdown headings (`##`, `###`), emojis where appropriate, and clear paragraph spacing. Provide clear explanations with real world examples when asked in simple terms.";
+        const formattingInstruction = isShort
+            ? " IMPORTANT: Provide a single short sentence in plain text only. DO NOT use markdown formatting, bolding, italics, headings, bullet points, asterisks, or hashes. Keep it extremely brief and easy to understand."
+            : " IMPORTANT: Be engaging, highly conversational, and format the output so it's very easy to read for users. DO NOT use markdown tables or the `|` character. DO NOT use bulleted asterisk lists `*`. Instead, use proper markdown headings (`##`, `###`), emojis where appropriate, and clear paragraph spacing. Provide clear explanations with real world examples when asked in simple terms.";
         const finalSystemMsg = systemMsg + formattingInstruction;
 
         const makeRequest = async (modelToUse: string) => {

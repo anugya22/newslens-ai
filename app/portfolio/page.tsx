@@ -354,12 +354,12 @@ export default function PortfolioPage() {
         []);
 
     // AI Helper: Robust call with enforced plain text
-    const callAI = async (prompt: string, systemMsg: string = 'You are a professional financial assistant.') => {
+    const callAI = async (prompt: string, systemMsg: string = 'You are a professional financial assistant.', isShort: boolean = false) => {
         try {
             const response = await fetch('/api/portfolio/insight', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, systemMsg })
+                body: JSON.stringify({ prompt, systemMsg, isShort })
             });
 
             if (!response.ok) {
@@ -417,7 +417,7 @@ export default function PortfolioPage() {
             const totalValueCalc = enrichedItems.reduce((acc, i) => acc + (i.value || 0), 0);
             const userPersona = `Style: ${userProfile?.investment_type || 'long_term'}, Risk: ${userProfile?.risk_profile || 'moderate'}`;
             const prompt = `Portfolio: ${enrichedItems.length} assets. Tot Val $${totalValueCalc.toFixed(0)}. Persona: ${userPersona}. 1-sentence insight. Confidence needed. ${isSimpleEnglish ? 'Explain like I am 10.' : 'Pro.'}`;
-            const content = await callAI(prompt, 'Finance AI. Risk focus.');
+            const content = await callAI(prompt, 'Finance AI. Risk focus.', true);
             setAiInsight(content);
             setLastInsightHash(currentHash);
         } catch (error: any) {
@@ -955,8 +955,8 @@ export default function PortfolioPage() {
                                     </div>
 
                                     <div className="max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
-                                        <div className="space-y-4 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
-                                            {selectedAdvice.content}
+                                        <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
+                                            <MarkdownRenderer content={selectedAdvice.content} />
                                         </div>
                                     </div>
 
@@ -1448,8 +1448,8 @@ export default function PortfolioPage() {
                                                 <p className="text-sm font-bold text-gray-400 animate-pulse uppercase tracking-[0.2em]">Analyzing Market Risk...</p>
                                             </div>
                                         ) : (
-                                            <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium whitespace-pre-wrap italic">
-                                                "{deletionAnalysis || "Analysis engine is recalibrating. Standard sell caution advised."}"
+                                            <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium italic">
+                                                {deletionAnalysis ? <MarkdownRenderer content={deletionAnalysis} /> : '"Analysis engine is recalibrating. Standard sell caution advised."'}
                                             </div>
                                         )}
                                     </div>
