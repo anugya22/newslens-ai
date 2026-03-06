@@ -14,7 +14,8 @@ import {
   Tag,
   RefreshCw,
   MessageSquare,
-  ChevronDown
+  ChevronDown,
+  ArrowLeft
 } from 'lucide-react';
 import { useChatAPI } from '../../hooks/useChat';
 import { GlassCard, Badge, Button } from '../ui/Button';
@@ -25,9 +26,10 @@ import { SentimentHeatmap } from './SentimentHeatmap';
 
 interface NewsSidebarProps {
   relatedTopic?: string;
+  onClearTopic?: () => void;
 }
 
-const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
+const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic, onClearTopic }) => {
   const { news, setNews, marketMode, cryptoMode } = useStore();
   const [loading, setLoading] = useState(false);
   const [trendingTopics, setTrendingTopics] = useState<string[]>([]);
@@ -212,7 +214,16 @@ const NewsSidebar: React.FC<NewsSidebarProps> = ({ relatedTopic }) => {
         <GlassCard className="p-4 flex flex-col h-auto">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {relatedTopic && onClearTopic && (
+                <button
+                  onClick={onClearTopic}
+                  className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors mr-1"
+                  title="Clear context and show all news"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              )}
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white line-clamp-1">
                 {relatedTopic ? `Latest: ${relatedTopic}` : 'Latest News'}
               </h2>
               <button

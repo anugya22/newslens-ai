@@ -37,11 +37,16 @@ export default function Home() {
 
 
 
+  // State for ignoring specific chat messages for news topic extraction
+  const [ignoredMessageId, setIgnoredMessageId] = useState<string | null>(null);
+
   // Get related topic from latest chat
   const getRelatedTopic = () => {
-    const latestUserMessage = [...messages]
+    const validMessages = [...messages]
       .reverse()
-      .find(msg => msg.type === 'user');
+      .filter(msg => msg.type === 'user' && msg.id !== ignoredMessageId);
+
+    const latestUserMessage = validMessages[0];
 
     if (latestUserMessage) {
       const content = latestUserMessage.content.toLowerCase();
@@ -131,7 +136,15 @@ export default function Home() {
               overflow-hidden
             `}>
               <div className="flex-1 overflow-y-auto scrollbar-hide">
-                <NewsSidebar relatedTopic={getRelatedTopic()} />
+                <NewsSidebar
+                  relatedTopic={getRelatedTopic()}
+                  onClearTopic={() => {
+                    const latestUserMsg = [...messages].reverse().find(msg => msg.type === 'user');
+                    if (latestUserMsg) {
+                      setIgnoredMessageId(latestUserMsg.id);
+                    }
+                  }}
+                />
               </div>
 
               {/* Mobile Overlay */}

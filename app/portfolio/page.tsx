@@ -391,7 +391,7 @@ export default function PortfolioPage() {
             Context: This asset makes up ${weight.toFixed(1)}% of the user's total portfolio ($${assetValue.toFixed(0)} of $${totalPortfolioValue.toFixed(0)}).
             Persona: ${userPersona}. Position: ${asset?.quantity || 0} units. 
             Explain specifically how this news affects the user's portfolio and net worth. Suggest strategy context. 
-            Confidence score 0.0-1.0. ${isSimpleEnglish ? 'Simple terminology.' : 'Professional terminology.'}`;
+            Confidence score 0.0-1.0. ${isSimpleEnglish ? 'Explain like I am 10. Use simple real-world examples and clear explanations.' : 'Professional terminology.'}`;
 
             const content = await callAI(prompt, 'Elite portfolio analyst. Focus on portfolio impact and capital preservation.');
             setSelectedAdvice({ title: stock, content: content });
@@ -416,7 +416,7 @@ export default function PortfolioPage() {
         try {
             const totalValueCalc = enrichedItems.reduce((acc, i) => acc + (i.value || 0), 0);
             const userPersona = `Style: ${userProfile?.investment_type || 'long_term'}, Risk: ${userProfile?.risk_profile || 'moderate'}`;
-            const prompt = `Portfolio: ${enrichedItems.length} assets. Tot Val $${totalValueCalc.toFixed(0)}. Persona: ${userPersona}. 1-sentence insight. Confidence needed. ${isSimpleEnglish ? 'Simple.' : 'Pro.'}`;
+            const prompt = `Portfolio: ${enrichedItems.length} assets. Tot Val $${totalValueCalc.toFixed(0)}. Persona: ${userPersona}. 1-sentence insight. Confidence needed. ${isSimpleEnglish ? 'Explain like I am 10.' : 'Pro.'}`;
             const content = await callAI(prompt, 'Finance AI. Risk focus.');
             setAiInsight(content);
             setLastInsightHash(currentHash);
@@ -707,7 +707,7 @@ export default function PortfolioPage() {
             2. Risk Summary (What happens if they sell now vs hold)
             3. Final Recommendation (Sell, Hold, or Trim)
             
-            Keep it under 100 words. ${isSimpleEnglish ? 'Simple English.' : 'Professional terminology.'}
+            Keep it under 100 words. ${isSimpleEnglish ? 'Explain like I am 10.' : 'Professional terminology.'}
             `;
             const analysis = await callAI(prompt, 'You are an elite financial risk manager.');
             setDeletionAnalysis(analysis);
@@ -1119,7 +1119,7 @@ export default function PortfolioPage() {
                                 className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                             />
                             <span className="text-xs font-bold text-gray-500 group-hover:text-primary-600 transition-colors">
-                                Explain in Simple English
+                                Explain like I'm 10 🎈
                             </span>
                         </label>
                     </div>
